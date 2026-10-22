@@ -7,6 +7,8 @@ export interface AiGenerateRequest {
   task?: AiTaskType;
   projectId?: string;
   selectedNodes?: CanvasNode[];
+  apiKey?: string;
+  camera?: { x: number; y: number; zoom: number };
 }
 
 export interface AiGenerateResponse {

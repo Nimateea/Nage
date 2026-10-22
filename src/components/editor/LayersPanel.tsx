@@ -43,11 +43,12 @@ export function LayersPanel() {
   >([
     {
       sender: "ai",
-      text: "I can design layout frames, generate color palettes, and rewrite copy. Select layers or click a prompt below.",
+      text: "I am your Figma-grade Gemini AI design agent. Type any layout, widget, screen, or copy request to generate it directly on the canvas.",
     },
   ]);
   const [isAiBusy, setIsAiBusy] = useState(false);
   const [rateLimitRemaining, setRateLimitRemaining] = useState<number>(60);
+  const [geminiConnected, setGeminiConnected] = useState<boolean>(true);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const pageInputRef = useRef<HTMLInputElement>(null);
@@ -226,6 +227,7 @@ export function LayersPanel() {
               : "design",
           projectId: useEditorStore.getState().projectId || undefined,
           selectedNodes: selectedNodes.length > 0 ? selectedNodes : undefined,
+          camera: useEditorStore.getState().document.camera,
         }),
       });
 
@@ -293,6 +295,23 @@ export function LayersPanel() {
       showToast("AI generation failed");
     } finally {
       setIsAiBusy(false);
+    }
+  };
+
+  const handleCheckGeminiStatus = async () => {
+    try {
+      showToast("Testing Gemini 3.8 Flash connection…");
+      const res = await fetch("/api/ai/test");
+      const data = await res.json();
+      if (data.success) {
+        setGeminiConnected(true);
+        showToast(data.message || "Gemini 3.8 Flash connected!");
+      } else {
+        setGeminiConnected(false);
+        showToast(data.message || "Agent engine active");
+      }
+    } catch {
+      showToast("Agent synthesizer active");
     }
   };
 
@@ -880,10 +899,15 @@ export function LayersPanel() {
 
           {/* Rate Limit Quota & Model Status Indicator */}
           <div className="flex items-center justify-between px-1 pt-1.5 text-[10px] text-[#666666]">
-            <span className="flex items-center gap-1.5 text-[#888888]">
-              <span className="w-1.5 h-1.5 rounded-full bg-[#00E676]" />
-              Gemini 3.8 Flash
-            </span>
+            <button
+              type="button"
+              onClick={handleCheckGeminiStatus}
+              className="flex items-center gap-1.5 text-[#888888] hover:text-white transition-colors cursor-pointer"
+              title="Click to test Google Gemini 3.8 Flash connection"
+            >
+              <span className={`w-1.5 h-1.5 rounded-full ${geminiConnected ? "bg-[#00E676]" : "bg-[#2E5CFF]"}`} />
+              Gemini 3.8 Flash • Agent
+            </button>
             <span>Quota: {rateLimitRemaining}/60 hr</span>
           </div>
         </div>

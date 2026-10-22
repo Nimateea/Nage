@@ -59,13 +59,16 @@ const FONT_WEIGHTS = [
 ];
 
 export function PropertiesPanel() {
-  const { document, selectedIds, executeCommand, showToast, projectName } = useEditorStore();
+  const { document, selectedIds, executeCommand, showToast } = useEditorStore();
   const [lockRatio, setLockRatio] = useState(false);
   const [exportFormat, setExportFormat] = useState<"png" | "svg" | "json">("png");
   const [exportScale, setExportScale] = useState<1 | 2 | 3>(1);
   const [isExporting, setIsExporting] = useState(false);
+  const [exportOpen, setExportOpen] = useState(false);
 
   const selectedNodes = document.nodes.filter((n) => selectedIds.has(n.id));
+
+  if (selectedNodes.length === 0) return null;
 
   const handleExport = async (nodesToExport: CanvasNode[], baseName: string) => {
     if (nodesToExport.length === 0) {
@@ -95,93 +98,6 @@ export function PropertiesPanel() {
       setIsExporting(false);
     }
   };
-
-  if (selectedNodes.length === 0) {
-    return (
-      <div className="ps select-none">
-        {/* Page / Canvas Info */}
-        <div className="ps-s">
-          <div className="ps-t">Page</div>
-          <div className="text-[#888888] text-[12px]">{projectName || "Untitled"}</div>
-        </div>
-
-        {/* Canvas Background */}
-        <div className="ps-s">
-          <div className="ps-t">Background</div>
-          <div className="ps-r">
-            <input
-              type="color"
-              className="ps-col"
-              value="#000000"
-              readOnly
-            />
-            <input
-              type="text"
-              className="ps-hex"
-              value="#000000"
-              readOnly
-              spellCheck={false}
-            />
-          </div>
-        </div>
-
-        {/* Export All Canvas Section */}
-        <div className="ps-s">
-          <div className="flex items-center justify-between mb-2">
-            <div className="ps-t mb-0">Export</div>
-          </div>
-
-          <div className="flex items-center gap-2 mb-2">
-            <div className="flex bg-[#161616] rounded-lg p-0.5 border border-[#222222] flex-1">
-              {(["png", "svg", "json"] as const).map((fmt) => (
-                <button
-                  key={fmt}
-                  type="button"
-                  onClick={() => setExportFormat(fmt)}
-                  className={`flex-1 py-1 text-[11px] font-medium rounded-md uppercase transition-colors ${
-                    exportFormat === fmt ? "bg-[#2A2A2A] text-white" : "text-[#777777] hover:text-white"
-                  }`}
-                >
-                  {fmt}
-                </button>
-              ))}
-            </div>
-
-            {exportFormat === "png" && (
-              <div className="flex bg-[#161616] rounded-lg p-0.5 border border-[#222222]">
-                {([1, 2, 3] as const).map((sc) => (
-                  <button
-                    key={sc}
-                    type="button"
-                    onClick={() => setExportScale(sc)}
-                    className={`px-2 py-1 text-[11px] font-medium rounded-md transition-colors ${
-                      exportScale === sc ? "bg-[#2A2A2A] text-white" : "text-[#777777] hover:text-white"
-                    }`}
-                  >
-                    {sc}x
-                  </button>
-                ))}
-              </div>
-            )}
-          </div>
-
-          <button
-            type="button"
-            disabled={isExporting || document.nodes.length === 0}
-            onClick={() => handleExport(document.nodes, projectName || "canvas")}
-            className="w-full h-8 rounded-lg bg-[#222222] hover:bg-[#2A2A2A] text-white font-medium text-[12px] flex items-center justify-center gap-2 border border-[#333333] transition-colors disabled:opacity-50 cursor-pointer"
-          >
-            <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-              <polyline points="7 10 12 15 17 10" />
-              <line x1="12" y1="15" x2="12" y2="3" />
-            </svg>
-            {isExporting ? "Exporting…" : "Export Canvas"}
-          </button>
-        </div>
-      </div>
-    );
-  }
 
   const isSingle = selectedNodes.length === 1;
   const singleNode = isSingle ? selectedNodes[0] : null;
@@ -938,68 +854,96 @@ export function PropertiesPanel() {
         </div>
       )}
 
-      {/* 11. Export Selection */}
+      {/* 11. Export Selection Dropdown */}
       <div className="ps-s">
-        <div className="flex items-center justify-between mb-2">
-          <div className="ps-t mb-0">Export</div>
-        </div>
-
-        <div className="flex items-center gap-2 mb-2">
-          {/* Format selector */}
-          <div className="flex bg-[#161616] rounded-lg p-0.5 border border-[#222222] flex-1">
-            {(["png", "svg", "json"] as const).map((fmt) => (
-              <button
-                key={fmt}
-                type="button"
-                onClick={() => setExportFormat(fmt)}
-                className={`flex-1 py-1 text-[11px] font-medium rounded-md uppercase transition-colors ${
-                  exportFormat === fmt ? "bg-[#2A2A2A] text-white" : "text-[#777777] hover:text-white"
-                }`}
-              >
-                {fmt}
-              </button>
-            ))}
-          </div>
-
-          {/* Scale selector (for PNG) */}
-          {exportFormat === "png" && (
-            <div className="flex bg-[#161616] rounded-lg p-0.5 border border-[#222222]">
-              {([1, 2, 3] as const).map((sc) => (
-                <button
-                  key={sc}
-                  type="button"
-                  onClick={() => setExportScale(sc)}
-                  className={`px-2 py-1 text-[11px] font-medium rounded-md transition-colors ${
-                    exportScale === sc ? "bg-[#2A2A2A] text-white" : "text-[#777777] hover:text-white"
-                  }`}
-                >
-                  {sc}x
-                </button>
-              ))}
-            </div>
-          )}
-        </div>
-
-        <button
-          type="button"
-          disabled={isExporting}
-          onClick={() =>
-            handleExport(
-              selectedNodes,
-              singleNode?.name || `${selectedNodes.length}-layers`
-            )
-          }
-          className="w-full h-8 rounded-lg bg-[#222222] hover:bg-[#2A2A2A] text-white font-medium text-[12px] flex items-center justify-center gap-2 border border-[#333333] transition-colors disabled:opacity-50 cursor-pointer"
+        <div
+          className="flex items-center justify-between cursor-pointer py-0.5 select-none"
+          onClick={() => setExportOpen((prev) => !prev)}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
-            <polyline points="7 10 12 15 17 10" />
-            <line x1="12" y1="15" x2="12" y2="3" />
-          </svg>
-          {isExporting
-            ? "Exporting…"
-            : `Export ${singleNode?.name || `${selectedNodes.length} Layers`}`}
-        </button>
+          <div className="ps-t mb-0 flex items-center gap-1.5">
+            <span>Export</span>
+          </div>
+          <button
+            type="button"
+            className="ps-b text-[#888888] hover:text-white"
+            title="Toggle export options"
+          >
+            <svg
+              width="14"
+              height="14"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`transition-transform duration-200 ${exportOpen ? "rotate-180 text-white" : ""}`}
+            >
+              <polyline points="6 9 12 15 18 9" />
+            </svg>
+          </button>
+        </div>
+
+        {exportOpen && (
+          <div className="mt-2.5">
+            <div className="flex items-center gap-2 mb-2">
+              {/* Format selector */}
+              <div className="flex bg-[#161616] rounded-lg p-0.5 border border-[#222222] flex-1">
+                {(["png", "svg", "json"] as const).map((fmt) => (
+                  <button
+                    key={fmt}
+                    type="button"
+                    onClick={() => setExportFormat(fmt)}
+                    className={`flex-1 py-1 text-[11px] font-medium rounded-md uppercase transition-colors ${
+                      exportFormat === fmt ? "bg-[#2A2A2A] text-white" : "text-[#777777] hover:text-white"
+                    }`}
+                  >
+                    {fmt}
+                  </button>
+                ))}
+              </div>
+
+              {/* Scale selector (for PNG) */}
+              {exportFormat === "png" && (
+                <div className="flex bg-[#161616] rounded-lg p-0.5 border border-[#222222]">
+                  {([1, 2, 3] as const).map((sc) => (
+                    <button
+                      key={sc}
+                      type="button"
+                      onClick={() => setExportScale(sc)}
+                      className={`px-2 py-1 text-[11px] font-medium rounded-md transition-colors ${
+                        exportScale === sc ? "bg-[#2A2A2A] text-white" : "text-[#777777] hover:text-white"
+                      }`}
+                    >
+                      {sc}x
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            <button
+              type="button"
+              disabled={isExporting}
+              onClick={() =>
+                handleExport(
+                  selectedNodes,
+                  singleNode?.name || `${selectedNodes.length}-layers`
+                )
+              }
+              className="w-full h-8 rounded-lg bg-[#222222] hover:bg-[#2A2A2A] text-white font-medium text-[12px] flex items-center justify-center gap-2 border border-[#333333] transition-colors disabled:opacity-50 cursor-pointer"
+            >
+              <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+                <polyline points="7 10 12 15 17 10" />
+                <line x1="12" y1="15" x2="12" y2="3" />
+              </svg>
+              {isExporting
+                ? "Exporting…"
+                : `Export ${singleNode?.name || `${selectedNodes.length} Layers`}`}
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

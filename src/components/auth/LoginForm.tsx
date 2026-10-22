@@ -81,6 +81,16 @@ export function LoginForm() {
           </Link>
         </span>
       </div>
+
+      <div className="mt-6 pt-5 border-t border-[#1a1a1a]">
+        <Link
+          href="/demo"
+          className="w-full flex items-center justify-center gap-2 py-2.5 px-4 rounded-full bg-[#111111] hover:bg-[#1a1a1a] border border-[#222222] text-[13px] text-white font-medium transition-all hover:border-[#333333]"
+        >
+          <span>Preview Canvas Demo</span>
+          <span className="text-[#888888]">→</span>
+        </Link>
+      </div>
     </AuthCard>
   );
 }

@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import Link from "next/link";
 import { signOutAction } from "@/lib/supabase/actions";
 
 interface DashboardHeaderProps {
@@ -94,6 +95,14 @@ export function DashboardHeader({
                   {displayName || "User"}
                 </p>
                 <p className="text-[#888888] text-[12px] truncate">{userEmail}</p>
+              </div>
+              <div className="py-1 border-b border-[#1A1A1A]">
+                <Link
+                  href="/demo"
+                  className="w-full block px-3.5 py-2 text-[13px] text-[#A0A0A0] hover:text-white hover:bg-[#1A1A1A] rounded-[12px] transition-colors"
+                >
+                  Open Demo Canvas
+                </Link>
               </div>
               <form action={signOutAction} className="mt-1">
                 <button

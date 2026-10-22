@@ -5,6 +5,9 @@ import type { CanvasDocument } from "@/lib/canvas/document/types";
 import type { Tables } from "@/lib/supabase/types";
 import { useEditorStore } from "@/lib/canvas/store/editorStore";
 import { CanvasStage } from "./canvas/CanvasStage";
+import { CanvasRulers } from "./canvas/CanvasRulers";
+import { ContextToolbar } from "./ContextToolbar";
+import { PageSwitcher } from "./PageSwitcher";
 import { Toolbar } from "./Toolbar";
 import { EditorHeader } from "./EditorHeader";
 import { EditorModals } from "./EditorModals";
@@ -36,8 +39,17 @@ export function EditorShell({
         userEmail={userEmail}
       />
 
+      {/* Rulers & Guides Layer */}
+      <CanvasRulers />
+
+      {/* Context Selection Toolbar (Text, Colors, Frame sizes) */}
+      <ContextToolbar />
+
       {/* 2D Infinite Canvas Host */}
       <CanvasStage />
+
+      {/* Page Switcher (Bottom Left) */}
+      <PageSwitcher />
 
       {/* Floating Bottom Toolbar */}
       <Toolbar />

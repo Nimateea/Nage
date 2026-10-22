@@ -51,7 +51,7 @@ export function Toolbar() {
           className={`w-9 h-9 -my-2 rounded-full flex items-center justify-center transition-all ${
             activeTool === "select"
               ? "bg-[#2A2A2A] opacity-100 text-white"
-              : "opacity-60 hover:opacity-100 text-[#A0A0A0] hover:text-white"
+              : "opacity-60 hover:opacity-100 text-white"
           }`}
           title="Move (V)"
         >
@@ -81,7 +81,7 @@ export function Toolbar() {
           className={`w-9 h-9 -my-2 rounded-full flex items-center justify-center transition-all ${
             activeTool === "hand"
               ? "bg-[#2A2A2A] opacity-100 text-white"
-              : "opacity-60 hover:opacity-100 text-[#A0A0A0] hover:text-white"
+              : "opacity-60 hover:opacity-100 text-white"
           }`}
           title="Hand (H)"
         >
@@ -108,7 +108,7 @@ export function Toolbar() {
           className={`w-9 h-9 -my-2 rounded-full flex items-center justify-center transition-all ${
             activeTool === "frame"
               ? "bg-[#2A2A2A] opacity-100 text-white"
-              : "opacity-60 hover:opacity-100 text-[#A0A0A0] hover:text-white"
+              : "opacity-60 hover:opacity-100 text-white"
           }`}
           title="Frame (F)"
         >
@@ -149,7 +149,7 @@ export function Toolbar() {
             className={`w-9 h-9 -my-2 rounded-full flex items-center justify-center transition-all ${
               activeTool === "rectangle" || activeTool === "ellipse"
                 ? "bg-[#2A2A2A] opacity-100 text-white"
-                : "opacity-60 hover:opacity-100 text-[#A0A0A0] hover:text-white"
+                : "opacity-60 hover:opacity-100 text-white"
             }`}
             title="Shape (R: Rectangle / O: Ellipse)"
           >
@@ -188,7 +188,7 @@ export function Toolbar() {
           className={`w-9 h-9 -my-2 rounded-full flex items-center justify-center transition-all ${
             activeTool === "text"
               ? "bg-[#2A2A2A] opacity-100 text-white"
-              : "opacity-60 hover:opacity-100 text-[#A0A0A0] hover:text-white"
+              : "opacity-60 hover:opacity-100 text-white"
           }`}
           title="Text (T)"
         >
@@ -211,7 +211,7 @@ export function Toolbar() {
           id="tool-image"
           type="button"
           onClick={handleImageClick}
-          className="w-9 h-9 -my-2 rounded-full flex items-center justify-center opacity-60 hover:opacity-100 text-[#A0A0A0] hover:text-white transition-all"
+          className="w-9 h-9 -my-2 rounded-full flex items-center justify-center opacity-60 hover:opacity-100 text-white transition-all"
           title="Import Image (I)"
         >
           <svg
@@ -252,7 +252,7 @@ export function Toolbar() {
           id="tool-center"
           type="button"
           onClick={centerView}
-          className="w-9 h-9 -my-2 rounded-full flex items-center justify-center opacity-60 hover:opacity-100 text-[#A0A0A0] hover:text-white transition-all"
+          className="w-9 h-9 -my-2 rounded-full flex items-center justify-center opacity-60 hover:opacity-100 text-white transition-all"
           title="Center View (Shift + 1)"
         >
           <svg
@@ -277,7 +277,7 @@ export function Toolbar() {
           id="tool-illustration"
           type="button"
           onClick={openIllustrationModal}
-          className="w-9 h-9 -my-2 rounded-full flex items-center justify-center opacity-60 hover:opacity-100 text-[#A0A0A0] hover:text-white transition-all"
+          className="w-9 h-9 -my-2 rounded-full flex items-center justify-center opacity-60 hover:opacity-100 text-white transition-all"
           title="Illustration Nodes"
         >
           <svg
@@ -316,7 +316,7 @@ export function Toolbar() {
           id="tool-shortcuts"
           type="button"
           onClick={openShortcutsModal}
-          className="w-9 h-9 -my-2 rounded-full flex items-center justify-center opacity-60 hover:opacity-100 text-[#A0A0A0] hover:text-white transition-all"
+          className="w-9 h-9 -my-2 rounded-full flex items-center justify-center opacity-60 hover:opacity-100 text-white transition-all"
           title="Shortcuts"
         >
           <svg

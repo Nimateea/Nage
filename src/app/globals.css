@@ -75,3 +75,52 @@ body {
 ::-webkit-scrollbar-track { background: transparent; }
 ::-webkit-scrollbar-thumb { background: var(--nage-border); border-radius: 9999px; }
 ::-webkit-scrollbar-thumb:hover { background: var(--nage-text-dim); }
+
+/* ── Nage Artifact Toolbar & Icon Buttons ──────────────────── */
+.toolbar {
+  background: #111111;
+  border-radius: 9999px;
+  padding: 12px 24px;
+  display: flex;
+  align-items: center;
+  gap: 24px;
+}
+
+.icon-btn {
+  color: #444444;
+  transition: color 0.2s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  outline: none;
+  border: none;
+  cursor: pointer;
+}
+
+.icon-btn svg {
+  transition: opacity 0.2s;
+}
+
+.icon-btn:hover svg {
+  opacity: 0.8;
+}
+
+.toolbar .icon-btn {
+  width: 36px;
+  height: 36px;
+  margin: -8px;
+  border-radius: 9999px;
+  transition: background 0.2s, opacity 0.2s;
+}
+
+.toolbar .icon-btn.on {
+  background: #2A2A2A;
+}
+
+.toolbar .tool {
+  opacity: 0.6;
+}
+
+.toolbar .tool.on {
+  opacity: 1;
+}

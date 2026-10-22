@@ -69,4 +69,12 @@ describe("useEditorStore", () => {
     expect(cam.y).toBe(0);
     expect(cam.zoom).toBe(1);
   });
+
+  it("toggles layers panel visibility", () => {
+    expect(useEditorStore.getState().layersPanelOpen).toBe(true);
+    useEditorStore.getState().toggleLayersPanel();
+    expect(useEditorStore.getState().layersPanelOpen).toBe(false);
+    useEditorStore.getState().setLayersPanelOpen(true);
+    expect(useEditorStore.getState().layersPanelOpen).toBe(true);
+  });
 });

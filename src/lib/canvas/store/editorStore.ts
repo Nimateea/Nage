@@ -43,6 +43,7 @@ export interface EditorState {
   // UI Modals & Toast
   shortcutsModalOpen: boolean;
   illustrationModalOpen: boolean;
+  layersPanelOpen: boolean;
   toastMessage: string | null;
 
   // Actions
@@ -55,6 +56,8 @@ export interface EditorState {
   clearSelection: () => void;
   setDragPreview: (rect: Rect | null) => void;
   setIsPanning: (isPanning: boolean) => void;
+  toggleLayersPanel: () => void;
+  setLayersPanelOpen: (open: boolean) => void;
 
   // Camera & Navigation
   panBy: (dx: number, dy: number) => void;
@@ -99,6 +102,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
 
   shortcutsModalOpen: false,
   illustrationModalOpen: false,
+  layersPanelOpen: true,
   toastMessage: null,
 
   initEditor: (projectId, projectName, doc) => {
@@ -112,6 +116,7 @@ export const useEditorStore = create<EditorState>((set, get) => ({
       hoveredId: null,
       dragPreview: null,
       isPanning: false,
+      layersPanelOpen: true,
     });
   },
 
@@ -257,6 +262,9 @@ export const useEditorStore = create<EditorState>((set, get) => ({
   openShortcutsModal: () => set({ shortcutsModalOpen: true }),
   openIllustrationModal: () => set({ illustrationModalOpen: true }),
   closeModals: () => set({ shortcutsModalOpen: false, illustrationModalOpen: false }),
+
+  toggleLayersPanel: () => set((state) => ({ layersPanelOpen: !state.layersPanelOpen })),
+  setLayersPanelOpen: (open) => set({ layersPanelOpen: open }),
 
   showToast: (msg) => {
     set({ toastMessage: msg });

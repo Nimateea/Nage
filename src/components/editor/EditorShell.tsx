@@ -8,6 +8,7 @@ import { CanvasStage } from "./canvas/CanvasStage";
 import { CanvasRulers } from "./canvas/CanvasRulers";
 import { ContextToolbar } from "./ContextToolbar";
 import { PropertiesPanel } from "./PropertiesPanel";
+import { LayersPanel } from "./LayersPanel";
 import { PageSwitcher } from "./PageSwitcher";
 import { Toolbar } from "./Toolbar";
 import { EditorHeader } from "./EditorHeader";
@@ -48,6 +49,9 @@ export function EditorShell({
 
       {/* Properties Panel (Right floating inspector for selected nodes) */}
       <PropertiesPanel />
+
+      {/* Layers Panel (Left floating tree hierarchy) */}
+      <LayersPanel />
 
       {/* 2D Infinite Canvas Host */}
       <CanvasStage />

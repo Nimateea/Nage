@@ -1,7 +1,6 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import { nanoid } from "nanoid";
 import { useEditorStore } from "@/lib/canvas/store/editorStore";
 import {
   AddNode,
@@ -9,11 +8,6 @@ import {
   DeleteNode,
   ReorderNodes,
 } from "@/lib/canvas/commands";
-import {
-  makeFrame,
-  makeText,
-  makeRectangle,
-} from "@/lib/canvas/document/defaults";
 import type { CanvasNode, TextNode } from "@/lib/canvas/document/types";
 
 export function LayersPanel() {
@@ -53,6 +47,7 @@ export function LayersPanel() {
     },
   ]);
   const [isAiBusy, setIsAiBusy] = useState(false);
+  const [rateLimitRemaining, setRateLimitRemaining] = useState<number>(60);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const pageInputRef = useRef<HTMLInputElement>(null);
@@ -158,223 +153,147 @@ export function LayersPanel() {
   };
 
   // ── AI Assistant Actions ───────────────────────────────────────────────────
-  const runAiPrompt = (promptText: string) => {
+  const runAiPrompt = async (promptText: string) => {
     const q = promptText.trim();
     if (!q || isAiBusy) return;
 
     setAiMessages((prev) => [...prev, { sender: "user", text: q }]);
     setIsAiBusy(true);
 
-    setTimeout(() => {
-      const lower = q.toLowerCase();
+    const lower = q.toLowerCase();
 
-      if (lower.includes("palette") || lower.includes("color")) {
-        // Generate Color Palette on Canvas
-        const colors = [
-          { name: "Primary Blue", hex: "#2E5CFF" },
-          { name: "Accent Coral", hex: "#FF5E2E" },
-          { name: "Dark Surface", hex: "#111111" },
-          { name: "Card Neutral", hex: "#1A1A1A" },
-          { name: "Muted Grey", hex: "#A0A0A0" },
-        ];
-        const frameX = 100;
-        const frameY = 100;
-        const palFrame = makeFrame({
-          id: nanoid(),
-          name: "Color Palette",
-          x: frameX,
-          y: frameY,
-          width: 520,
-          height: 140,
-          cornerRadius: 16,
-          fill: { type: "solid", color: "#0A0A0A", opacity: 1 },
-          stroke: { color: "#222222", width: 1, opacity: 1, style: "solid" },
-        });
-        executeCommand(new AddNode(palFrame));
-
-        colors.forEach((c, idx) => {
-          const swatch = makeRectangle({
-            id: nanoid(),
-            name: c.name,
-            x: frameX + 24 + idx * 96,
-            y: frameY + 24,
-            width: 80,
-            height: 60,
-            cornerRadius: 10,
-            fill: { type: "solid", color: c.hex, opacity: 1 },
-            stroke: { color: "#333333", width: 1, opacity: 1, style: "solid" },
-            parentId: palFrame.id,
-          });
-          executeCommand(new AddNode(swatch));
-
-          const label = makeText({
-            id: nanoid(),
-            name: `${c.name} Label`,
-            x: frameX + 24 + idx * 96,
-            y: frameY + 92,
-            width: 80,
-            height: 20,
-            content: c.hex,
-            fontSize: 11,
-            color: "#888888",
-            textAlign: "center",
-            parentId: palFrame.id,
-          });
-          executeCommand(new AddNode(label));
-        });
-
-        setSelectedIds([palFrame.id]);
-        setAiMessages((prev) => [
-          ...prev,
-          { sender: "ai", text: "Generated a 5-color palette artboard on the canvas." },
-        ]);
-        showToast("Palette generated");
-      } else if (lower.includes("design") || lower.includes("layout") || lower.includes("make a design")) {
-        // Generate Hero Artboard Layout
-        const artboard = makeFrame({
-          id: nanoid(),
-          name: "Hero Section",
-          x: -200,
-          y: -150,
-          width: 480,
-          height: 320,
-          cornerRadius: 16,
-          fill: { type: "solid", color: "#0D0D0D", opacity: 1 },
-          stroke: { color: "#222222", width: 1, opacity: 1, style: "solid" },
-        });
-        executeCommand(new AddNode(artboard));
-
-        const headline = makeText({
-          id: nanoid(),
-          name: "Headline",
-          x: -160,
-          y: -100,
-          width: 400,
-          height: 48,
-          content: "Craft with Precision",
-          fontSize: 28,
-          fontWeight: 700,
-          color: "#FFFFFF",
-          parentId: artboard.id,
-        });
-        executeCommand(new AddNode(headline));
-
-        const subhead = makeText({
-          id: nanoid(),
-          name: "Subhead",
-          x: -160,
-          y: -44,
-          width: 400,
-          height: 36,
-          content: "A minimal, lightning-fast design studio for modern product teams.",
-          fontSize: 14,
-          fontWeight: 400,
-          color: "#888888",
-          parentId: artboard.id,
-        });
-        executeCommand(new AddNode(subhead));
-
-        const btn = makeRectangle({
-          id: nanoid(),
-          name: "CTA Button",
-          x: -160,
-          y: 20,
-          width: 140,
-          height: 44,
-          cornerRadius: 22,
-          fill: { type: "solid", color: "#2E5CFF", opacity: 1 },
-          stroke: { color: "#2E5CFF", width: 0, opacity: 1, style: "solid" },
-          parentId: artboard.id,
-        });
-        executeCommand(new AddNode(btn));
-
-        const btnLabel = makeText({
-          id: nanoid(),
-          name: "CTA Label",
-          x: -160,
-          y: 32,
-          width: 140,
-          height: 20,
-          content: "Get Started →",
-          fontSize: 13,
-          fontWeight: 600,
-          color: "#FFFFFF",
-          textAlign: "center",
-          parentId: artboard.id,
-        });
-        executeCommand(new AddNode(btnLabel));
-
-        setSelectedIds([artboard.id]);
-        setAiMessages((prev) => [
-          ...prev,
-          { sender: "ai", text: "Created a hero section layout frame with headline and button." },
-        ]);
-        showToast("Design generated");
-      } else if (lower.includes("rename")) {
-        // Rename frames to clean names
-        const frames = document.nodes.filter((n) => n.type === "frame");
-        frames.forEach((f, idx) => {
-          executeCommand(new UpdateProps(f.id, f, { name: `Artboard ${idx + 1}` }));
+    // Fast-path client-side operations for instant feedback on selected layers
+    if (
+      (lower.includes("rewrite") || lower.includes("shorten")) &&
+      !lower.includes("make") &&
+      !lower.includes("design")
+    ) {
+      const selectedText = document.nodes.filter(
+        (n): n is TextNode => selectedIds.has(n.id) && n.type === "text"
+      );
+      if (selectedText.length > 0) {
+        selectedText.forEach((t) => {
+          const rewritten = lower.includes("shorten")
+            ? t.content.slice(0, 30) + (t.content.length > 30 ? "…" : "")
+            : "Design Without Friction";
+          executeCommand(new UpdateProps(t.id, t, { content: rewritten }));
         });
         setAiMessages((prev) => [
           ...prev,
-          { sender: "ai", text: `Renamed ${frames.length} frames to structured artboard names.` },
+          { sender: "ai", text: `Updated copy on ${selectedText.length} text layer(s).` },
         ]);
-        showToast("Frames renamed");
-      } else if (lower.includes("rewrite") || lower.includes("shorten")) {
-        // Rewrite text nodes
-        const selectedText = document.nodes.filter(
-          (n): n is TextNode => selectedIds.has(n.id) && n.type === "text"
+        showToast("Text updated");
+        setIsAiBusy(false);
+        return;
+      }
+    }
+
+    if (
+      lower.includes("rename frames") ||
+      (lower.includes("rename") && lower.includes("frame"))
+    ) {
+      const frames = document.nodes.filter((n) => n.type === "frame");
+      frames.forEach((f, idx) => {
+        executeCommand(
+          new UpdateProps(f.id, f, { name: `Artboard ${idx + 1}` })
         );
-        if (selectedText.length > 0) {
-          selectedText.forEach((t) => {
-            const rewritten = lower.includes("shorten")
-              ? t.content.slice(0, 30) + "…"
-              : "Design Without Friction";
-            executeCommand(new UpdateProps(t.id, t, { content: rewritten }));
-          });
-          setAiMessages((prev) => [
-            ...prev,
-            { sender: "ai", text: `Updated copy on ${selectedText.length} text layer(s).` },
-          ]);
-        } else {
-          setAiMessages((prev) => [
-            ...prev,
-            { sender: "ai", text: "Select a text layer first to rewrite or shorten it." },
-          ]);
-        }
-      } else if (lower.includes("translate")) {
-        const selectedText = document.nodes.filter(
-          (n) => selectedIds.has(n.id) && n.type === "text"
-        );
-        if (selectedText.length > 0) {
-          selectedText.forEach((t) => {
-            executeCommand(
-              new UpdateProps(t.id, t, { content: "Concevoir sans friction" })
-            );
-          });
-          setAiMessages((prev) => [
-            ...prev,
-            { sender: "ai", text: "Translated selected text to French." },
-          ]);
-        } else {
-          setAiMessages((prev) => [
-            ...prev,
-            { sender: "ai", text: "Select a text layer first to translate it." },
-          ]);
-        }
-      } else {
+      });
+      setAiMessages((prev) => [
+        ...prev,
+        {
+          sender: "ai",
+          text: `Renamed ${frames.length} frames to structured artboard names.`,
+        },
+      ]);
+      showToast("Frames renamed");
+      setIsAiBusy(false);
+      return;
+    }
+
+    // Call the server Gemini AI API
+    try {
+      const selectedNodes = document.nodes.filter((n) => selectedIds.has(n.id));
+      const res = await fetch("/api/ai/generate", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          prompt: q,
+          task:
+            lower.includes("palette") || lower.includes("color")
+              ? "palette"
+              : lower.includes("copy") || lower.includes("rewrite")
+              ? "copy"
+              : "design",
+          projectId: useEditorStore.getState().projectId || undefined,
+          selectedNodes: selectedNodes.length > 0 ? selectedNodes : undefined,
+        }),
+      });
+
+      const data = await res.json();
+
+      if (res.status === 429) {
         setAiMessages((prev) => [
           ...prev,
           {
             sender: "ai",
-            text: `Processed: "${q}". You can ask me to "Make a design", "Color palette", "Rename frames", or select text to "Rewrite".`,
+            text:
+              "⚠️ " +
+              (data.text ||
+                "Rate limit reached. Please wait a moment before sending another prompt."),
           },
         ]);
+        showToast("Rate limit reached");
+        if (data.rateLimitRemaining !== undefined) {
+          setRateLimitRemaining(data.rateLimitRemaining);
+        }
+        return;
       }
 
+      if (!res.ok || !data.success) {
+        throw new Error(data.error || "Generation failed");
+      }
+
+      // Add AI reply message
+      setAiMessages((prev) => [
+        ...prev,
+        { sender: "ai", text: data.text || "Design generated successfully." },
+      ]);
+
+      if (data.rateLimitRemaining !== undefined) {
+        setRateLimitRemaining(data.rateLimitRemaining);
+      }
+
+      // If nodes were generated, commit them to the canvas!
+      if (Array.isArray(data.generatedNodes) && data.generatedNodes.length > 0) {
+        // Execute AddNode command for each generated node
+        data.generatedNodes.forEach((node: CanvasNode) => {
+          executeCommand(new AddNode(node));
+        });
+
+        // Select the primary frame or first node
+        const primary =
+          data.generatedNodes.find((n: CanvasNode) => n.type === "frame") ||
+          data.generatedNodes[0];
+        if (primary) {
+          setSelectedIds([primary.id]);
+        }
+
+        showToast("Design added to canvas");
+      }
+    } catch (err: unknown) {
+      console.error("AI error:", err);
+      setAiMessages((prev) => [
+        ...prev,
+        {
+          sender: "ai",
+          text:
+            "I couldn't reach the generation service right now. Please try again or click one of the quick prompts.",
+        },
+      ]);
+      showToast("AI generation failed");
+    } finally {
       setIsAiBusy(false);
-    }, 450);
+    }
   };
 
   // ── Icons for Node Types ───────────────────────────────────────────────────
@@ -957,6 +876,15 @@ export function LayersPanel() {
                 <polygon points="22 2 15 22 11 13 2 9 22 2" />
               </svg>
             </button>
+          </div>
+
+          {/* Rate Limit Quota & Model Status Indicator */}
+          <div className="flex items-center justify-between px-1 pt-1.5 text-[10px] text-[#666666]">
+            <span className="flex items-center gap-1.5 text-[#888888]">
+              <span className="w-1.5 h-1.5 rounded-full bg-[#00E676]" />
+              Gemini 3.8 Flash
+            </span>
+            <span>Quota: {rateLimitRemaining}/60 hr</span>
           </div>
         </div>
       )}

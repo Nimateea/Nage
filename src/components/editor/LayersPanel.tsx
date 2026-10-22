@@ -43,7 +43,7 @@ export function LayersPanel() {
   >([
     {
       sender: "ai",
-      text: "I am your Figma-grade Gemini AI design agent. Type any layout, widget, screen, or copy request to generate it directly on the canvas.",
+      text: "I am your Gemini AI Design Agent. I can generate movie storyboards from scripts, creative moodboards, wireframes from Pinterest boards, or vector illustrations from reference images.",
     },
   ]);
   const [isAiBusy, setIsAiBusy] = useState(false);
@@ -56,6 +56,13 @@ export function LayersPanel() {
     return "";
   });
   const [showKeyInput, setShowKeyInput] = useState<boolean>(false);
+
+  // File attachment state for storyboards (scripts) and illustrations/moodboards (images)
+  const [attachedImage, setAttachedImage] = useState<string | null>(null);
+  const [attachedImageName, setAttachedImageName] = useState<string | null>(null);
+  const [attachedScript, setAttachedScript] = useState<string | null>(null);
+  const [attachedScriptName, setAttachedScriptName] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const pageInputRef = useRef<HTMLInputElement>(null);
@@ -161,9 +168,45 @@ export function LayersPanel() {
   };
 
   // ── AI Assistant Actions ───────────────────────────────────────────────────
+  const handleFileUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (file.type.startsWith("image/")) {
+      const reader = new FileReader();
+      reader.onload = () => {
+        const result = reader.result as string;
+        setAttachedImage(result);
+        setAttachedImageName(file.name);
+        showToast(`Attached reference image: ${file.name}`);
+      };
+      reader.readAsDataURL(file);
+    } else {
+      // Treat as screenplay script or text prompt
+      const reader = new FileReader();
+      reader.onload = () => {
+        const text = reader.result as string;
+        setAttachedScript(text);
+        setAttachedScriptName(file.name);
+        showToast(`Attached script: ${file.name}`);
+      };
+      reader.readAsText(file);
+    }
+
+    e.target.value = "";
+  };
+
   const runAiPrompt = async (promptText: string) => {
     const q = promptText.trim();
     if (!q || isAiBusy) return;
+
+    // Capture attachments and reset them in UI
+    const currentAttachedImage = attachedImage;
+    const currentAttachedScript = attachedScript;
+    setAttachedImage(null);
+    setAttachedImageName(null);
+    setAttachedScript(null);
+    setAttachedScriptName(null);
 
     setAiMessages((prev) => [...prev, { sender: "user", text: q }]);
     setIsAiBusy(true);
@@ -218,6 +261,43 @@ export function LayersPanel() {
       return;
     }
 
+    // Determine creative agent task type
+    let task = "design";
+    if (
+      lower.includes("storyboard") ||
+      lower.includes("script") ||
+      lower.includes("screenplay") ||
+      lower.includes("movie") ||
+      lower.includes("scene") ||
+      currentAttachedScript
+    ) {
+      task = "storyboard";
+    } else if (
+      lower.includes("moodboard") ||
+      lower.includes("mood board") ||
+      lower.includes("inspiration board") ||
+      lower.includes("creative direction")
+    ) {
+      task = "moodboard";
+    } else if (
+      lower.includes("pinterest") ||
+      lower.includes("wireframe") ||
+      lower.includes("board into")
+    ) {
+      task = "wireframe";
+    } else if (
+      lower.includes("illustrat") ||
+      lower.includes("vector") ||
+      lower.includes("drawing") ||
+      currentAttachedImage
+    ) {
+      task = "illustration";
+    } else if (lower.includes("palette") || lower.includes("color")) {
+      task = "palette";
+    } else if (lower.includes("copy") || lower.includes("rewrite")) {
+      task = "copy";
+    }
+
     // Call the server Gemini AI API
     try {
       const selectedNodes = document.nodes.filter((n) => selectedIds.has(n.id));
@@ -226,12 +306,9 @@ export function LayersPanel() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           prompt: q,
-          task:
-            lower.includes("palette") || lower.includes("color")
-              ? "palette"
-              : lower.includes("copy") || lower.includes("rewrite")
-              ? "copy"
-              : "design",
+          task,
+          attachedImage: currentAttachedImage || undefined,
+          attachedScript: currentAttachedScript || undefined,
           projectId: useEditorStore.getState().projectId || undefined,
           selectedNodes: selectedNodes.length > 0 ? selectedNodes : undefined,
           camera: useEditorStore.getState().document.camera,
@@ -861,26 +938,112 @@ export function LayersPanel() {
           {/* Quick Action Chips */}
           <div className="flex flex-wrap gap-1 mb-2 pt-1 border-t border-[#1A1A1A]">
             {[
-              "Make a design",
+              "🎬 Storyboard",
+              "🎨 Moodboard",
+              "📌 Pinterest Wireframe",
+              "✏️ Illustration",
+              "✦ Make a design",
               "Color palette",
-              "Rewrite",
-              "Shorten",
-              "Translate",
-              "Rename frames",
-            ].map((chip) => (
-              <button
-                key={chip}
-                type="button"
-                onClick={() => runAiPrompt(chip)}
-                className="text-[10px] bg-[#161616] hover:bg-[#222222] text-[#A0A0A0] hover:text-white px-2 py-1 rounded-full border border-[#262626] transition-colors cursor-pointer"
-              >
-                {chip}
-              </button>
-            ))}
+            ].map((chip) => {
+              const promptMap: Record<string, string> = {
+                "🎬 Storyboard": "Generate a cinematic storyboard for a sci-fi thriller screenplay opening scene",
+                "🎨 Moodboard": "Generate a creative direction moodboard for a Scandinavian architectural studio",
+                "📌 Pinterest Wireframe": "Create a wireframe inspired by an editorial minimalist moodboard",
+                "✏️ Illustration": "Create a vector illustration of a mountain sunrise with atmospheric layers",
+                "✦ Make a design": "Design a modern mobile analytics card with metrics and sparkline",
+              };
+              const textToRun = promptMap[chip] || chip;
+              return (
+                <button
+                  key={chip}
+                  type="button"
+                  onClick={() => runAiPrompt(textToRun)}
+                  className="text-[10px] bg-[#161616] hover:bg-[#222222] text-[#A0A0A0] hover:text-white px-2 py-1 rounded-full border border-[#262626] transition-colors cursor-pointer"
+                >
+                  {chip}
+                </button>
+              );
+            })}
           </div>
+
+          {/* Active Attachments Preview Bar */}
+          {(attachedImage || attachedScript) && (
+            <div className="flex flex-wrap gap-1.5 mb-2 px-0.5">
+              {attachedImage && (
+                <div className="flex items-center gap-1.5 bg-[#171C2E] text-[#8EA2FF] border border-[#2E5CFF]/40 rounded-lg px-2 py-1 text-[10px]">
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={attachedImage}
+                    alt="Ref"
+                    className="w-4 h-4 object-cover rounded"
+                  />
+                  <span className="truncate max-w-[100px]" title={attachedImageName || "Reference image"}>
+                    {attachedImageName || "Image Ref"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAttachedImage(null);
+                      setAttachedImageName(null);
+                    }}
+                    className="text-[#8EA2FF] hover:text-white ml-0.5 cursor-pointer"
+                    title="Remove attachment"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+              {attachedScript && (
+                <div className="flex items-center gap-1.5 bg-[#2B1B14] text-[#FF9E66] border border-[#FF5E2E]/40 rounded-lg px-2 py-1 text-[10px]">
+                  <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                    <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+                    <polyline points="14 2 14 8 20 8" />
+                    <line x1="16" y1="13" x2="8" y2="13" />
+                    <line x1="16" y1="17" x2="8" y2="17" />
+                  </svg>
+                  <span className="truncate max-w-[100px]" title={attachedScriptName || "Screenplay script"}>
+                    {attachedScriptName || "Script.txt"}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setAttachedScript(null);
+                      setAttachedScriptName(null);
+                    }}
+                    className="text-[#FF9E66] hover:text-white ml-0.5 cursor-pointer"
+                    title="Remove attachment"
+                  >
+                    ✕
+                  </button>
+                </div>
+              )}
+            </div>
+          )}
 
           {/* Prompt Input Box */}
           <div className="flex items-center gap-1.5 bg-[#161616] p-1.5 rounded-xl border border-[#262626]">
+            {/* Hidden File Input for Script/Image Upload */}
+            <input
+              type="file"
+              ref={fileInputRef}
+              onChange={handleFileUpload}
+              accept="image/*,.txt,.fountain,.md"
+              className="hidden"
+            />
+            <button
+              type="button"
+              onClick={() => fileInputRef.current?.click()}
+              className={`p-1 rounded-lg transition-colors cursor-pointer ${
+                attachedImage || attachedScript
+                  ? "text-[#2E5CFF] bg-[#2E5CFF]/15"
+                  : "text-[#888888] hover:text-white hover:bg-[#222222]"
+              }`}
+              title="Upload movie script or reference image"
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
+              </svg>
+            </button>
             <input
               type="text"
               value={aiInput}
@@ -891,7 +1054,13 @@ export function LayersPanel() {
                   setAiInput("");
                 }
               }}
-              placeholder="Ask AI to design, rewrite…"
+              placeholder={
+                attachedScript
+                  ? "Describe shot tone or press send…"
+                  : attachedImage
+                  ? "Prompt illustration from reference…"
+                  : "Storyboard, moodboard, wireframe, art…"
+              }
               className="flex-1 bg-transparent text-white text-[11px] outline-none px-1"
             />
             <button

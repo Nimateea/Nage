@@ -1,7 +1,7 @@
 import { GoogleGenAI } from "@google/genai";
 import { nanoid } from "nanoid";
 import { getSupabaseAdminClient } from "../supabase/admin";
-import type { CanvasNode, FrameNode, RectangleNode, TextNode, EllipseNode, LineNode } from "../canvas/document/types";
+import type { CanvasNode, FrameNode, RectangleNode, TextNode, EllipseNode, LineNode, ImageNode } from "../canvas/document/types";
 import type { AiGenerateRequest, AiGenerateResponse } from "./types";
 import { NAGE_AI_SYSTEM_INSTRUCTION, generateAgentDesign } from "./prompts";
 
@@ -242,6 +242,29 @@ function normalizeAiNodes(
         parentId: typeof r.parentId === "string" ? r.parentId : null,
       };
       normalized.push(lineNode);
+    } else if (type === "image") {
+      const storagePath = typeof r.storagePath === "string" ? r.storagePath : "";
+      const signedUrl = typeof r.signedUrl === "string" ? r.signedUrl : storagePath;
+      const imgNode: ImageNode = {
+        id,
+        name,
+        type: "image",
+        x,
+        y,
+        width,
+        height,
+        visible: true,
+        locked: false,
+        opacity: 1,
+        rotation: 0,
+        storagePath,
+        signedUrl,
+        naturalWidth: typeof r.naturalWidth === "number" ? r.naturalWidth : width,
+        naturalHeight: typeof r.naturalHeight === "number" ? r.naturalHeight : height,
+        objectFit: r.objectFit === "fill" || r.objectFit === "contain" || r.objectFit === "cover" ? r.objectFit : "cover",
+        parentId: typeof r.parentId === "string" ? r.parentId : null,
+      };
+      normalized.push(imgNode);
     }
   }
 
@@ -387,14 +410,36 @@ export async function executeAiGeneration(
         )}`;
       }
 
-      const promptWithPosition = `${req.prompt}\n(Target spawn coordinates on canvas: x=${originX}, y=${originY})${contextInfo}`;
+      let promptWithPosition = `${req.prompt}\n(Target spawn coordinates on canvas: x=${originX}, y=${originY})${contextInfo}`;
+
+      if (req.attachedScript) {
+        promptWithPosition += `\n\n--- ATTACHED SCRIPT / SCREENPLAY ---\n${req.attachedScript}\n--- END SCRIPT ---`;
+      }
+
+      type GeminiPart = { text: string } | { inlineData: { mimeType: string; data: string } };
+      const parts: GeminiPart[] = [];
+
+      // Multimodal image reference support
+      if (req.attachedImage && req.attachedImage.startsWith("data:")) {
+        const match = req.attachedImage.match(/^data:([^;]+);base64,(.+)$/);
+        if (match) {
+          parts.push({
+            inlineData: {
+              mimeType: match[1],
+              data: match[2],
+            },
+          });
+        }
+      }
+
+      parts.push({ text: promptWithPosition });
 
       const response = await client.models.generateContent({
         model: GEMINI_MODEL,
         contents: [
           {
             role: "user",
-            parts: [{ text: promptWithPosition }],
+            parts,
           },
         ],
         config: {
@@ -439,7 +484,13 @@ export async function executeAiGeneration(
   }
 
   // 3. Fallback Agentic Design Synthesizer (synthesizes whatever the user typed!)
-  const agentOutput = generateAgentDesign(req.prompt, req.task, req.camera);
+  const agentOutput = generateAgentDesign(
+    req.prompt,
+    req.task,
+    req.camera,
+    req.attachedImage,
+    req.attachedScript
+  );
 
   await logAiGeneration(
     userId,

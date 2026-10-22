@@ -66,6 +66,94 @@ describe("AI Generation Engine", () => {
       expect(frame?.name).toBe("Analytics Metrics");
     });
 
+    it("generates a movie storyboard with shots, angles, dialogue from script", () => {
+      const script = "EXT. RAIN HIGHWAY - NIGHT. John checks his watch. The tracker blinks.";
+      const result = generateAgentDesign(
+        "Generate storyboard",
+        "storyboard",
+        undefined,
+        undefined,
+        script
+      );
+      expect(result.reply).toContain("storyboard");
+      const frame = result.nodes.find((n) => n.type === "frame");
+      expect(frame).toBeDefined();
+      expect(frame?.name).toContain("Storyboard");
+
+      // Verify cinematic shot cards and angle tags
+      const cards = result.nodes.filter(
+        (n) => n.type === "rectangle" && n.name.includes("Shot")
+      );
+      expect(cards.length).toBeGreaterThanOrEqual(4);
+
+      const angleTags = result.nodes.filter(
+        (n) => n.type === "text" && (n.content.includes("WIDE") || n.content.includes("SHOT"))
+      );
+      expect(angleTags.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("generates a creative direction moodboard with palette and typography", () => {
+      const result = generateAgentDesign(
+        "Create moodboard for Scandinavian Minimalist Interior",
+        "moodboard"
+      );
+      expect(result.reply).toContain("Moodboard");
+      const frame = result.nodes.find((n) => n.type === "frame");
+      expect(frame).toBeDefined();
+      expect(frame?.name).toContain("Moodboard");
+
+      // Verify color palette swatches
+      const swatches = result.nodes.filter(
+        (n) => n.type === "rectangle" && n.name.includes("Swatch")
+      );
+      expect(swatches.length).toBe(5);
+
+      // Verify typography samples
+      const texts = result.nodes.filter(
+        (n) => n.type === "text" && n.content.includes("Aa")
+      );
+      expect(texts.length).toBeGreaterThanOrEqual(1);
+    });
+
+    it("generates a UI wireframe from a Pinterest board description", () => {
+      const result = generateAgentDesign(
+        "Create a wireframe based on an editorial Pinterest board with clean grid and product showcase",
+        "wireframe"
+      );
+      expect(result.reply).toContain("wireframe");
+      const frame = result.nodes.find((n) => n.type === "frame");
+      expect(frame).toBeDefined();
+      expect(frame?.name).toContain("Wireframe");
+
+      // Verify modular cards
+      const cards = result.nodes.filter(
+        (n) => n.type === "rectangle" && n.name.includes("Card")
+      );
+      expect(cards.length).toBeGreaterThanOrEqual(3);
+    });
+
+    it("generates vector illustration with atmospheric depth and image reference support", () => {
+      const sampleDataUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+      const result = generateAgentDesign(
+        "Create vector illustration of a futuristic skyline",
+        "illustration",
+        undefined,
+        sampleDataUrl
+      );
+      expect(result.reply).toContain("illustration");
+      const frame = result.nodes.find((n) => n.type === "frame");
+      expect(frame).toBeDefined();
+      expect(frame?.name).toContain("Illustration");
+
+      // Verify atmospheric layers and celestial orb
+      const orb = result.nodes.find((n) => n.type === "ellipse");
+      expect(orb).toBeDefined();
+
+      // Verify image node created for attached reference
+      const img = result.nodes.find((n) => n.type === "image");
+      expect(img).toBeDefined();
+    });
+
     it("synthesizes ANY custom arbitrary user prompt", () => {
       const result = generateAgentDesign("Crypto wallet portfolio card with send receive buttons");
       expect(result.reply).toContain("Synthesized custom");

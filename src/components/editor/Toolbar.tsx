@@ -2,6 +2,8 @@
 
 import React, { useRef, useState } from "react";
 import { useEditorStore } from "@/lib/canvas/store/editorStore";
+import { makeImage } from "@/lib/canvas/document/defaults";
+import { AddNode } from "@/lib/canvas/commands";
 
 export function Toolbar() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -24,10 +26,44 @@ export function Toolbar() {
 
   const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      showToast(`Selected image: ${file.name}`);
-      // Image upload and node insertion will be fully wired in Step 11
-    }
+    if (!file) return;
+
+    const reader = new FileReader();
+    reader.onload = () => {
+      const dataUrl = reader.result as string;
+      const img = new window.Image();
+      img.onload = () => {
+        const naturalWidth = img.naturalWidth || 300;
+        const naturalHeight = img.naturalHeight || 200;
+        const width = Math.min(360, naturalWidth);
+        const height = Math.round(width * (naturalHeight / naturalWidth));
+
+        // Center on camera
+        const doc = useEditorStore.getState().document;
+        const wx = Math.round(-doc.camera.x / doc.camera.zoom - width / 2);
+        const wy = Math.round(-doc.camera.y / doc.camera.zoom - height / 2);
+
+        const imageNode = makeImage({
+          x: wx,
+          y: wy,
+          width,
+          height,
+          naturalWidth,
+          naturalHeight,
+          storagePath: dataUrl,
+          signedUrl: dataUrl,
+          name: file.name.slice(0, 30),
+        });
+
+        useEditorStore.getState().executeCommand(new AddNode(imageNode));
+        useEditorStore.getState().setSelectedIds([imageNode.id]);
+        useEditorStore.getState().setActiveTool("select");
+        showToast(`Imported ${file.name}`);
+      };
+      img.src = dataUrl;
+    };
+    reader.readAsDataURL(file);
+    e.target.value = "";
   };
 
   return (

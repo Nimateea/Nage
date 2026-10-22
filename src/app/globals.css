@@ -124,3 +124,190 @@ body {
 .toolbar .tool.on {
   opacity: 1;
 }
+
+/* ── Nage Artifact Properties Panel (.ps) ─────────────────── */
+.ps {
+  position: fixed;
+  right: 16px;
+  top: 76px;
+  width: 244px;
+  max-height: calc(100vh - 160px);
+  overflow-y: auto;
+  z-index: 25;
+  background: #111111;
+  border: 1px solid #222222;
+  border-radius: 20px;
+  padding: 6px 14px 10px;
+  box-shadow: 0 20px 40px rgba(0, 0, 0, 0.6);
+  color: #A0A0A0;
+  font-size: 12px;
+}
+
+.ps-s {
+  padding: 10px 0;
+  border-bottom: 1px solid #1A1A1A;
+}
+
+.ps-s:last-child {
+  border-bottom: none;
+}
+
+.ps-t {
+  color: #FFFFFF;
+  font-size: 12px;
+  font-weight: 500;
+  margin-bottom: 8px;
+}
+
+.ps-g {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 8px;
+  margin-bottom: 8px;
+}
+
+.ps-r {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+
+.pf {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  height: 32px;
+  padding: 0 10px;
+  border-radius: 8px;
+  background: #161616;
+  border: 1px solid transparent;
+  min-width: 0;
+}
+
+.pf:focus-within {
+  border-color: #333333;
+}
+
+.pf span {
+  color: #666666;
+  font-size: 11px;
+  min-width: 14px;
+  cursor: ew-resize;
+  user-select: none;
+}
+
+.pf input {
+  flex: 1;
+  min-width: 0;
+  width: 100%;
+  background: transparent;
+  color: #FFFFFF;
+  font-size: 12px;
+  outline: none;
+}
+
+.ps-sel {
+  width: 100%;
+  height: 32px;
+  border-radius: 8px;
+  background: #161616;
+  color: #FFFFFF;
+  font-size: 12px;
+  padding: 0 8px;
+  outline: none;
+  border: 1px solid transparent;
+  margin-bottom: 8px;
+}
+
+.ps-g .ps-sel {
+  margin-bottom: 0;
+}
+
+.ps-sel option {
+  background: #111111;
+}
+
+.ps-b {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  color: #A0A0A0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 12px;
+  transition: all 0.2s;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.ps-b:hover {
+  color: #FFFFFF;
+}
+
+.ps-b.on {
+  background: #2A2A2A;
+  color: #FFFFFF;
+}
+
+.ps-w {
+  width: auto;
+  padding: 0 10px;
+  font-size: 11px;
+}
+
+.ps-ck {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  color: #A0A0A0;
+  cursor: pointer;
+}
+
+.ps-col {
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  border: 1px solid #333333;
+  border-radius: 8px;
+  background: none;
+  cursor: pointer;
+  -webkit-appearance: none;
+  appearance: none;
+}
+
+.ps-col::-webkit-color-swatch-wrapper {
+  padding: 0;
+}
+
+.ps-col::-webkit-color-swatch {
+  border: none;
+  border-radius: 6px;
+}
+
+.ps-hex {
+  flex: 1;
+  min-width: 0;
+  height: 32px;
+  border-radius: 8px;
+  background: #161616;
+  color: #FFFFFF;
+  font-size: 12px;
+  padding: 0 10px;
+  outline: none;
+  border: 1px solid transparent;
+}
+
+.ps-hex:focus {
+  border-color: #333333;
+}
+
+.ps-sep {
+  width: 1px;
+  height: 16px;
+  background: #222222;
+  margin: 0 4px;
+}

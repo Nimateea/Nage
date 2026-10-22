@@ -257,3 +257,63 @@ export class RotateNode implements Command {
     };
   }
 }
+
+// ── UpdateProps ───────────────────────────────────────────────────────────────
+
+export class UpdateProps implements Command {
+  readonly id = nanoid();
+  readonly label = "Update properties";
+  private readonly nodeId: string;
+  private readonly prevProps: Partial<CanvasNode>;
+  private readonly nextProps: Partial<CanvasNode>;
+
+  constructor(
+    nodeId: string,
+    prevProps: Partial<CanvasNode>,
+    nextProps: Partial<CanvasNode>
+  ) {
+    this.nodeId = nodeId;
+    this.prevProps = prevProps;
+    this.nextProps = nextProps;
+  }
+
+  execute(doc: CanvasDocument): CanvasDocument {
+    return {
+      ...doc,
+      nodes: doc.nodes.map((n) =>
+        n.id === this.nodeId ? ({ ...n, ...this.nextProps } as CanvasNode) : n
+      ),
+    };
+  }
+
+  undo(doc: CanvasDocument): CanvasDocument {
+    return {
+      ...doc,
+      nodes: doc.nodes.map((n) =>
+        n.id === this.nodeId ? ({ ...n, ...this.prevProps } as CanvasNode) : n
+      ),
+    };
+  }
+}
+
+// ── ReorderNodes ──────────────────────────────────────────────────────────────
+
+export class ReorderNodes implements Command {
+  readonly id = nanoid();
+  readonly label = "Reorder layers";
+  private readonly prevNodes: CanvasNode[];
+  private readonly nextNodes: CanvasNode[];
+
+  constructor(prevNodes: CanvasNode[], nextNodes: CanvasNode[]) {
+    this.prevNodes = prevNodes;
+    this.nextNodes = nextNodes;
+  }
+
+  execute(doc: CanvasDocument): CanvasDocument {
+    return { ...doc, nodes: this.nextNodes };
+  }
+
+  undo(doc: CanvasDocument): CanvasDocument {
+    return { ...doc, nodes: this.prevNodes };
+  }
+}

@@ -1,5 +1,6 @@
 import { describe, it, expect } from "vitest";
 import { makeEmptyDocument, makeRectangle } from "@/lib/canvas/document/defaults";
+import type { RectangleNode } from "@/lib/canvas/document/types";
 import {
   AddNode,
   DeleteNode,
@@ -7,6 +8,8 @@ import {
   MoveNodes,
   ResizeNode,
   RotateNode,
+  UpdateProps,
+  ReorderNodes,
 } from "@/lib/canvas/commands/index";
 import {
   makeHistory,
@@ -117,6 +120,38 @@ describe("Commands", () => {
 
     const reverted = rotate.undo(rotated);
     expect(reverted.nodes[0].rotation).toBe(0);
+  });
+
+  it("UpdateProps modifies node properties and undo restores previous properties", () => {
+    let doc = makeEmptyDocument();
+    const node = makeRectangle({ id: "r-props", opacity: 1, cornerRadius: 0 });
+    doc = new AddNode(node).execute(doc);
+
+    const update = new UpdateProps("r-props", { opacity: 1, cornerRadius: 0 }, { opacity: 0.5, cornerRadius: 16 });
+    const updated = update.execute(doc);
+    expect(updated.nodes[0].opacity).toBe(0.5);
+    expect((updated.nodes[0] as RectangleNode).cornerRadius).toBe(16);
+
+    const reverted = update.undo(updated);
+    expect(reverted.nodes[0].opacity).toBe(1);
+    expect((reverted.nodes[0] as RectangleNode).cornerRadius).toBe(0);
+  });
+
+  it("ReorderNodes updates z-order and undo reverts it", () => {
+    let doc = makeEmptyDocument();
+    const r1 = makeRectangle({ id: "layer1" });
+    const r2 = makeRectangle({ id: "layer2" });
+    doc = new AddNode(r1).execute(doc);
+    doc = new AddNode(r2).execute(doc);
+
+    const reorder = new ReorderNodes([r1, r2], [r2, r1]);
+    const reordered = reorder.execute(doc);
+    expect(reordered.nodes[0].id).toBe("layer2");
+    expect(reordered.nodes[1].id).toBe("layer1");
+
+    const reverted = reorder.undo(reordered);
+    expect(reverted.nodes[0].id).toBe("layer1");
+    expect(reverted.nodes[1].id).toBe("layer2");
   });
 });
 

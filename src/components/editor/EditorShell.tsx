@@ -7,6 +7,7 @@ import { useEditorStore } from "@/lib/canvas/store/editorStore";
 import { CanvasStage } from "./canvas/CanvasStage";
 import { CanvasRulers } from "./canvas/CanvasRulers";
 import { ContextToolbar } from "./ContextToolbar";
+import { PropertiesPanel } from "./PropertiesPanel";
 import { PageSwitcher } from "./PageSwitcher";
 import { Toolbar } from "./Toolbar";
 import { EditorHeader } from "./EditorHeader";
@@ -44,6 +45,9 @@ export function EditorShell({
 
       {/* Context Selection Toolbar (Text, Colors, Frame sizes) */}
       <ContextToolbar />
+
+      {/* Properties Panel (Right floating inspector for selected nodes) */}
+      <PropertiesPanel />
 
       {/* 2D Infinite Canvas Host */}
       <CanvasStage />

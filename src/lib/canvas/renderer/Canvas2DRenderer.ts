@@ -2,6 +2,8 @@ import type {
   IRenderer,
   Point,
   Rect,
+  ResizeHandle,
+  TransformHitResult,
 } from "./IRenderer";
 import type {
   CanvasDocument,
@@ -9,6 +11,29 @@ import type {
   Camera,
 } from "../document/types";
 import { renderNode } from "./renderNode";
+
+export function getResizeCursor(handle: ResizeHandle, rotation = 0): string {
+  const baseAngles: Record<ResizeHandle, number> = {
+    n: 0,
+    ne: 45,
+    e: 90,
+    se: 135,
+    s: 180,
+    sw: 225,
+    w: 270,
+    nw: 315,
+  };
+  const cursors = [
+    "ns-resize",
+    "nesw-resize",
+    "ew-resize",
+    "nwse-resize",
+  ];
+  let angle = (baseAngles[handle] + rotation) % 360;
+  if (angle < 0) angle += 360;
+  const index = Math.round(angle / 45) % 8;
+  return cursors[index % 4];
+}
 
 export class Canvas2DRenderer implements IRenderer {
   private canvas: HTMLCanvasElement | null = null;
@@ -207,6 +232,105 @@ export class Canvas2DRenderer implements IRenderer {
     ctx.restore();
   }
 
+  hitTestTransformHandle(
+    worldPoint: Point,
+    doc: CanvasDocument,
+    selectedIds: Set<string>
+  ): TransformHitResult | null {
+    if (selectedIds.size === 0) return null;
+
+    const z = doc.camera.zoom;
+    const hitRadius = Math.max(6, 8 / z) / 2 + 5 / z;
+
+    if (selectedIds.size === 1) {
+      const selectedId = Array.from(selectedIds)[0];
+      const node = doc.nodes.find((n) => n.id === selectedId);
+      if (!node) return null;
+
+      const cx = node.x + node.width / 2;
+      const cy = node.y + node.height / 2;
+
+      let dx = worldPoint.x - cx;
+      let dy = worldPoint.y - cy;
+
+      if (node.rotation) {
+        const rad = (-node.rotation * Math.PI) / 180;
+        const cos = Math.cos(rad);
+        const sin = Math.sin(rad);
+        const rx = dx * cos - dy * sin;
+        const ry = dx * sin + dy * cos;
+        dx = rx;
+        dy = ry;
+      }
+
+      // 1. Rotation handle: at (0, -node.height / 2 - 20 / z)
+      const rotY = -node.height / 2 - 20 / z;
+      if (Math.hypot(dx, dy - rotY) <= hitRadius * 1.5) {
+        return { type: "rotate", node, center: { x: cx, y: cy } };
+      }
+
+      // 2. 8 resize handles
+      const hw = node.width / 2;
+      const hh = node.height / 2;
+      const handles: { handle: ResizeHandle; x: number; y: number }[] = [
+        { handle: "nw", x: -hw, y: -hh },
+        { handle: "n", x: 0, y: -hh },
+        { handle: "ne", x: hw, y: -hh },
+        { handle: "e", x: hw, y: 0 },
+        { handle: "se", x: hw, y: hh },
+        { handle: "s", x: 0, y: hh },
+        { handle: "sw", x: -hw, y: hh },
+        { handle: "w", x: -hw, y: 0 },
+      ];
+
+      for (const h of handles) {
+        if (Math.abs(dx - h.x) <= hitRadius && Math.abs(dy - h.y) <= hitRadius) {
+          return {
+            type: "resize",
+            handle: h.handle,
+            node,
+            bounds: { x: node.x, y: node.y, width: node.width, height: node.height },
+          };
+        }
+      }
+    } else {
+      // Multi-selection bounds
+      const selectedNodes = doc.nodes.filter((n) => selectedIds.has(n.id));
+      const bounds = this.computeBounds(selectedNodes);
+      if (!bounds) return null;
+
+      const cx = bounds.x + bounds.width / 2;
+      const cy = bounds.y + bounds.height / 2;
+      const dx = worldPoint.x - cx;
+      const dy = worldPoint.y - cy;
+      const hw = bounds.width / 2;
+      const hh = bounds.height / 2;
+
+      const handles: { handle: ResizeHandle; x: number; y: number }[] = [
+        { handle: "nw", x: -hw, y: -hh },
+        { handle: "n", x: 0, y: -hh },
+        { handle: "ne", x: hw, y: -hh },
+        { handle: "e", x: hw, y: 0 },
+        { handle: "se", x: hw, y: hh },
+        { handle: "s", x: 0, y: hh },
+        { handle: "sw", x: -hw, y: hh },
+        { handle: "w", x: -hw, y: 0 },
+      ];
+
+      for (const h of handles) {
+        if (Math.abs(dx - h.x) <= hitRadius && Math.abs(dy - h.y) <= hitRadius) {
+          return {
+            type: "resize",
+            handle: h.handle,
+            bounds,
+          };
+        }
+      }
+    }
+
+    return null;
+  }
+
   private drawSelection(ctx: CanvasRenderingContext2D, doc: CanvasDocument): void {
     if (this.selectedIds.size === 0) return;
 
@@ -235,22 +359,46 @@ export class Canvas2DRenderer implements IRenderer {
       ctx.lineWidth = 1.5 / z;
       ctx.strokeRect(0, 0, node.width, node.height);
 
-      // Corner handles: white square with blue border
+      // 8 Resize handles: white square with blue border
       ctx.fillStyle = "#FFFFFF";
       ctx.strokeStyle = "#2E5CFF";
       ctx.lineWidth = 1 / z;
 
-      const corners = [
+      const hw = node.width / 2;
+      const hh = node.height / 2;
+      const handles = [
         [0, 0],
+        [hw, 0],
         [node.width, 0],
+        [node.width, hh],
         [node.width, node.height],
+        [hw, node.height],
         [0, node.height],
+        [0, hh],
       ];
 
-      for (const [hx, hy] of corners) {
+      for (const [hx, hy] of handles) {
         ctx.fillRect(hx - handleSize / 2, hy - handleSize / 2, handleSize, handleSize);
         ctx.strokeRect(hx - handleSize / 2, hy - handleSize / 2, handleSize, handleSize);
       }
+
+      // Rotation handle: connection line and circular handle
+      const rotY = -20 / z;
+      ctx.beginPath();
+      ctx.moveTo(hw, 0);
+      ctx.lineTo(hw, rotY);
+      ctx.strokeStyle = "#2E5CFF";
+      ctx.lineWidth = 1 / z;
+      ctx.stroke();
+
+      const rotRadius = 4 / z;
+      ctx.beginPath();
+      ctx.arc(hw, rotY, rotRadius, 0, Math.PI * 2);
+      ctx.fillStyle = "#FFFFFF";
+      ctx.fill();
+      ctx.strokeStyle = "#2E5CFF";
+      ctx.lineWidth = 1 / z;
+      ctx.stroke();
 
       // Dimension badge underneath (e.g. "300 × 200")
       const label = `${Math.round(node.width)} × ${Math.round(node.height)}`;
@@ -278,6 +426,49 @@ export class Canvas2DRenderer implements IRenderer {
         ctx.strokeStyle = "#2E5CFF";
         ctx.lineWidth = 1.5 / z;
         ctx.strokeRect(bounds.x, bounds.y, bounds.width, bounds.height);
+
+        // 8 Resize handles on multi-selection box
+        ctx.fillStyle = "#FFFFFF";
+        ctx.strokeStyle = "#2E5CFF";
+        ctx.lineWidth = 1 / z;
+
+        const hw = bounds.width / 2;
+        const hh = bounds.height / 2;
+        const handles = [
+          [bounds.x, bounds.y],
+          [bounds.x + hw, bounds.y],
+          [bounds.x + bounds.width, bounds.y],
+          [bounds.x + bounds.width, bounds.y + hh],
+          [bounds.x + bounds.width, bounds.y + bounds.height],
+          [bounds.x + hw, bounds.y + bounds.height],
+          [bounds.x, bounds.y + bounds.height],
+          [bounds.x, bounds.y + hh],
+        ];
+
+        for (const [hx, hy] of handles) {
+          ctx.fillRect(hx - handleSize / 2, hy - handleSize / 2, handleSize, handleSize);
+          ctx.strokeRect(hx - handleSize / 2, hy - handleSize / 2, handleSize, handleSize);
+        }
+
+        // Dimension badge underneath multi-selection
+        const label = `${Math.round(bounds.width)} × ${Math.round(bounds.height)}`;
+        ctx.font = `500 ${Math.max(10, 11 / z)}px Inter, sans-serif`;
+        const textWidth = ctx.measureText(label).width;
+        const badgePaddingX = 6 / z;
+        const badgeH = 16 / z;
+        const badgeW = textWidth + badgePaddingX * 2;
+        const badgeX = bounds.x + bounds.width / 2 - badgeW / 2;
+        const badgeY = bounds.y + bounds.height + 8 / z;
+
+        ctx.fillStyle = "#2E5CFF";
+        ctx.beginPath();
+        ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 4 / z);
+        ctx.fill();
+
+        ctx.fillStyle = "#FFFFFF";
+        ctx.textAlign = "center";
+        ctx.textBaseline = "middle";
+        ctx.fillText(label, bounds.x + bounds.width / 2, badgeY + badgeH / 2);
       }
     }
 

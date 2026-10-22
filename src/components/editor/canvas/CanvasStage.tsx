@@ -1,9 +1,20 @@
 "use client";
 
 import React, { useEffect, useRef, useState, useCallback } from "react";
-import { Canvas2DRenderer } from "@/lib/canvas/renderer/Canvas2DRenderer";
+import { nanoid } from "nanoid";
+import {
+  Canvas2DRenderer,
+  getResizeCursor,
+} from "@/lib/canvas/renderer/Canvas2DRenderer";
+import type { ResizeHandle } from "@/lib/canvas/renderer/IRenderer";
 import { useEditorStore } from "@/lib/canvas/store/editorStore";
-import { AddNode, DeleteNode } from "@/lib/canvas/commands";
+import {
+  AddNode,
+  DeleteNode,
+  MoveNodes,
+  ResizeNode,
+  RotateNode,
+} from "@/lib/canvas/commands";
 import {
   makeRectangle,
   makeEllipse,
@@ -20,6 +31,8 @@ export function CanvasStage() {
 
   const [isSpacePressed, setIsSpacePressed] = useState(false);
   const [editingTextId, setEditingTextId] = useState<string | null>(null);
+  const [cursorOverride, setCursorOverride] = useState<string | null>(null);
+  const [viewportSize, setViewportSize] = useState({ width: 0, height: 0 });
 
   const isDraggingCanvasRef = useRef(false);
   const lastMousePosRef = useRef<{ x: number; y: number }>({ x: 0, y: 0 });
@@ -31,6 +44,35 @@ export function CanvasStage() {
     tool: "rectangle" | "ellipse" | "frame" | "line";
   } | null>(null);
 
+  // Dragging nodes ref
+  const isDraggingNodesRef = useRef<{
+    startWorldPoint: { x: number; y: number };
+    initialPositions: { id: string; x: number; y: number; x2?: number; y2?: number }[];
+    hasMoved: boolean;
+  } | null>(null);
+
+  // Resizing node ref
+  const isResizingRef = useRef<{
+    handle: ResizeHandle;
+    nodeId?: string;
+    initialBounds: { x: number; y: number; width: number; height: number };
+    startWorldPoint: { x: number; y: number };
+    rotation: number;
+  } | null>(null);
+
+  // Rotating node ref
+  const isRotatingRef = useRef<{
+    nodeId: string;
+    center: { x: number; y: number };
+    initialRotation: number;
+  } | null>(null);
+
+  // Marquee selection ref
+  const isMarqueeRef = useRef<{
+    startWorldPoint: { x: number; y: number };
+    initialSelectedIds: Set<string>;
+  } | null>(null);
+
   // Double-click tracker
   const lastClickRef = useRef<{ time: number; nodeId: string | null }>({
     time: 0,
@@ -40,15 +82,13 @@ export function CanvasStage() {
   const {
     document,
     selectedIds,
-    hoveredId,
-    dragPreview,
     activeTool,
     isPanning,
-    setIsPanning,
+    dragPreview,
     panBy,
     zoomAt,
+    setIsPanning,
     setSelectedIds,
-    toggleSelectId,
     clearSelection,
     setHoveredId,
     setActiveTool,
@@ -59,44 +99,47 @@ export function CanvasStage() {
     executeCommand,
   } = useEditorStore();
 
-  // 1. Mount Renderer & handle resize
+  // 1. Mount Renderer & Canvas
   useEffect(() => {
     const canvas = canvasRef.current;
-    const container = containerRef.current;
-    if (!canvas || !container) return;
+    if (!canvas) return;
 
     const renderer = new Canvas2DRenderer();
     renderer.mount(canvas);
     rendererRef.current = renderer;
 
-    const updateSize = () => {
-      if (!container || !rendererRef.current) return;
-      const width = container.clientWidth;
-      const height = container.clientHeight;
-      const dpr = window.devicePixelRatio || 1;
-      rendererRef.current.resize(width, height, dpr);
-    };
+    const container = containerRef.current;
+    if (!container) return;
 
-    updateSize();
-
-    const resizeObserver = new ResizeObserver(() => {
-      updateSize();
+    const ro = new ResizeObserver((entries) => {
+      const entry = entries[0];
+      if (!entry) return;
+      const { width, height } = entry.contentRect;
+      renderer.resize(width, height);
+      setViewportSize({ width, height });
     });
-    resizeObserver.observe(container);
+
+    ro.observe(container);
 
     return () => {
-      resizeObserver.disconnect();
+      ro.disconnect();
       renderer.destroy();
       rendererRef.current = null;
     };
   }, []);
 
-  // 2. Sync document, selection, hovered, and dragPreview to renderer
+  // 2. Sync State with Renderer
   useEffect(() => {
-    if (rendererRef.current) {
-      rendererRef.current.render(document, selectedIds, hoveredId, dragPreview);
-    }
-  }, [document, selectedIds, hoveredId, dragPreview]);
+    const renderer = rendererRef.current;
+    if (!renderer) return;
+
+    renderer.render(
+      document,
+      new Set(selectedIds),
+      useEditorStore.getState().hoveredId,
+      dragPreview
+    );
+  }, [document, selectedIds, dragPreview]);
 
   // 3. Wheel event for trackpad pan & zoom (with passive: false)
   useEffect(() => {
@@ -125,7 +168,7 @@ export function CanvasStage() {
     };
   }, [panBy, zoomAt]);
 
-  // 4. Keyboard shortcuts (Space to pan, V, H, F, R, O, T, L, I, Shift+1, Undo, Redo, Delete)
+  // 4. Keyboard shortcuts (Space to pan, V, H, F, R, O, T, L, I, Shift+1, Undo, Redo, Duplicate, Delete)
   useEffect(() => {
     const isEditingInput = (target: EventTarget | null) => {
       if (!target || !(target instanceof HTMLElement)) return false;
@@ -156,6 +199,34 @@ export function CanvasStage() {
       if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "y") {
         e.preventDefault();
         redo();
+        return;
+      }
+
+      // Duplicate: Cmd+D / Ctrl+D
+      if ((e.metaKey || e.ctrlKey) && e.key.toLowerCase() === "d") {
+        if (selectedIds.size > 0) {
+          e.preventDefault();
+          const currentDoc = useEditorStore.getState().document;
+          const selectedNodes = currentDoc.nodes.filter((n) => selectedIds.has(n.id));
+          const duplicates: CanvasNode[] = [];
+
+          for (const node of selectedNodes) {
+            const copy = {
+              ...node,
+              id: nanoid(),
+              name: `${node.name} Copy`,
+              x: node.x + 20,
+              y: node.y + 20,
+            };
+            if (copy.type === "line") {
+              copy.x2 += 20;
+              copy.y2 += 20;
+            }
+            duplicates.push(copy);
+            executeCommand(new AddNode(copy));
+          }
+          setSelectedIds(duplicates.map((n) => n.id));
+        }
         return;
       }
 
@@ -233,9 +304,10 @@ export function CanvasStage() {
     clearSelection,
     executeCommand,
     setActiveTool,
+    setSelectedIds,
   ]);
 
-  // 5. Pointer Events (Pan, Hit-Testing, and Click-and-Drag Creation)
+  // 5. Pointer Events (Pan, Hit-Testing, Handles, Drag/Move, Resize, Rotate, Marquee)
   const handlePointerDown = useCallback(
     (e: React.PointerEvent<HTMLDivElement>) => {
       const container = containerRef.current;
@@ -306,12 +378,42 @@ export function CanvasStage() {
         return;
       }
 
-      // Select / Hit testing
+      // Select / Hit testing / Transform handles
       if (e.button === 0 && activeTool === "select") {
+        // 1. Check if transform handles were clicked on selected node(s)
+        const handleHit = renderer.hitTestTransformHandle?.(
+          worldPoint,
+          document,
+          selectedIds
+        );
+
+        if (handleHit?.type === "rotate") {
+          isRotatingRef.current = {
+            nodeId: handleHit.node.id,
+            center: handleHit.center,
+            initialRotation: handleHit.node.rotation,
+          };
+          e.currentTarget.setPointerCapture(e.pointerId);
+          return;
+        }
+
+        if (handleHit?.type === "resize") {
+          isResizingRef.current = {
+            handle: handleHit.handle,
+            nodeId: handleHit.node?.id,
+            initialBounds: handleHit.bounds,
+            startWorldPoint: worldPoint,
+            rotation: handleHit.node ? handleHit.node.rotation : 0,
+          };
+          e.currentTarget.setPointerCapture(e.pointerId);
+          return;
+        }
+
+        // 2. Check if a node was clicked
         const hitNode = renderer.hitTest(worldPoint, document);
         const now = Date.now();
 
-        // Check for double click on text
+        // Double click on text to inline edit
         if (
           hitNode &&
           hitNode.type === "text" &&
@@ -326,17 +428,48 @@ export function CanvasStage() {
         lastClickRef.current = { time: now, nodeId: hitNode ? hitNode.id : null };
 
         if (hitNode) {
+          let nextSelected = new Set(selectedIds);
           if (e.shiftKey) {
-            toggleSelectId(hitNode.id);
+            if (nextSelected.has(hitNode.id)) {
+              nextSelected.delete(hitNode.id);
+            } else {
+              nextSelected.add(hitNode.id);
+            }
+            setSelectedIds(Array.from(nextSelected));
           } else {
-            setSelectedIds([hitNode.id]);
+            if (!nextSelected.has(hitNode.id)) {
+              nextSelected = new Set([hitNode.id]);
+              setSelectedIds([hitNode.id]);
+            }
           }
+
+          // Start dragging nodes
+          const nodesToDrag = document.nodes.filter((n) => nextSelected.has(n.id));
+          isDraggingNodesRef.current = {
+            startWorldPoint: worldPoint,
+            initialPositions: nodesToDrag.map((n) => ({
+              id: n.id,
+              x: n.x,
+              y: n.y,
+              x2: n.type === "line" ? n.x2 : undefined,
+              y2: n.type === "line" ? n.y2 : undefined,
+            })),
+            hasMoved: false,
+          };
+          e.currentTarget.setPointerCapture(e.pointerId);
         } else {
+          // Clicked empty canvas space
           if (!e.shiftKey) {
             clearSelection();
           }
-          // If clicked on empty space, close inline editor
           setEditingTextId(null);
+
+          // Start marquee box selection
+          isMarqueeRef.current = {
+            startWorldPoint: worldPoint,
+            initialSelectedIds: e.shiftKey ? new Set(selectedIds) : new Set(),
+          };
+          e.currentTarget.setPointerCapture(e.pointerId);
         }
       }
     },
@@ -344,9 +477,9 @@ export function CanvasStage() {
       isSpacePressed,
       activeTool,
       document,
+      selectedIds,
       setIsPanning,
       setSelectedIds,
-      toggleSelectId,
       clearSelection,
       executeCommand,
       setActiveTool,
@@ -360,7 +493,14 @@ export function CanvasStage() {
       const renderer = rendererRef.current;
       if (!container || !renderer) return;
 
-      // Handle canvas drag-pan
+      const rect = container.getBoundingClientRect();
+      const screenPoint = {
+        x: e.clientX - rect.left,
+        y: e.clientY - rect.top,
+      };
+      const worldPoint = renderer.screenToWorld(screenPoint, document.camera);
+
+      // 1. Handle canvas drag-pan
       if (isDraggingCanvasRef.current) {
         const dx = e.clientX - lastMousePosRef.current.x;
         const dy = e.clientY - lastMousePosRef.current.y;
@@ -369,37 +509,213 @@ export function CanvasStage() {
         return;
       }
 
-      // Handle drag preview during shape creation
+      // 2. Handle shape creation preview
       if (isCreatingShapeRef.current) {
-        const rect = container.getBoundingClientRect();
-        const screenPoint = {
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top,
-        };
-        const currentWorld = renderer.screenToWorld(screenPoint, document.camera);
-
-        const x = Math.min(isCreatingShapeRef.current.startX, currentWorld.x);
-        const y = Math.min(isCreatingShapeRef.current.startY, currentWorld.y);
-        const width = Math.abs(currentWorld.x - isCreatingShapeRef.current.startX);
-        const height = Math.abs(currentWorld.y - isCreatingShapeRef.current.startY);
+        const x = Math.min(isCreatingShapeRef.current.startX, worldPoint.x);
+        const y = Math.min(isCreatingShapeRef.current.startY, worldPoint.y);
+        const width = Math.abs(worldPoint.x - isCreatingShapeRef.current.startX);
+        const height = Math.abs(worldPoint.y - isCreatingShapeRef.current.startY);
 
         setDragPreview({ x, y, width, height });
         return;
       }
 
-      // Hover detection on select tool
+      // 3. Handle rotating node
+      if (isRotatingRef.current) {
+        const { nodeId, center } = isRotatingRef.current;
+        const currentAngle =
+          (Math.atan2(worldPoint.y - center.y, worldPoint.x - center.x) * 180) / Math.PI + 90;
+        let deg = currentAngle;
+        if (e.shiftKey) {
+          deg = Math.round(deg / 15) * 15;
+        }
+        deg = Math.round(((deg % 360) + 360) % 360);
+
+        useEditorStore.setState((s) => ({
+          document: {
+            ...s.document,
+            nodes: s.document.nodes.map((n) =>
+              n.id === nodeId ? { ...n, rotation: deg } : n
+            ),
+          },
+        }));
+        return;
+      }
+
+      // 4. Handle resizing node
+      if (isResizingRef.current) {
+        const { handle, nodeId, initialBounds, startWorldPoint, rotation } =
+          isResizingRef.current;
+
+        let dx = worldPoint.x - startWorldPoint.x;
+        let dy = worldPoint.y - startWorldPoint.y;
+
+        if (rotation) {
+          const rad = (-rotation * Math.PI) / 180;
+          const cos = Math.cos(rad);
+          const sin = Math.sin(rad);
+          const rdx = dx * cos - dy * sin;
+          const rdy = dx * sin + dy * cos;
+          dx = rdx;
+          dy = rdy;
+        }
+
+        let nextX = initialBounds.x;
+        let nextY = initialBounds.y;
+        let nextW = initialBounds.width;
+        let nextH = initialBounds.height;
+
+        // Resize direction calculation
+        if (handle.includes("e")) nextW = initialBounds.width + dx;
+        if (handle.includes("w")) {
+          nextW = initialBounds.width - dx;
+          nextX = initialBounds.x + dx;
+        }
+        if (handle.includes("s")) nextH = initialBounds.height + dy;
+        if (handle.includes("n")) {
+          nextH = initialBounds.height - dy;
+          nextY = initialBounds.y + dy;
+        }
+
+        // Alt modifier: symmetrical center resize
+        if (e.altKey) {
+          if (handle.includes("e") || handle.includes("w")) {
+            nextW = initialBounds.width + Math.abs(dx) * 2;
+            nextX = initialBounds.x + initialBounds.width / 2 - nextW / 2;
+          }
+          if (handle.includes("s") || handle.includes("n")) {
+            nextH = initialBounds.height + Math.abs(dy) * 2;
+            nextY = initialBounds.y + initialBounds.height / 2 - nextH / 2;
+          }
+        }
+
+        // Shift modifier: aspect ratio preservation
+        if (e.shiftKey) {
+          const aspect = initialBounds.width / Math.max(1, initialBounds.height);
+          if (Math.abs(dx) > Math.abs(dy)) {
+            nextH = nextW / aspect;
+          } else {
+            nextW = nextH * aspect;
+          }
+        }
+
+        // Minimum bounds constraint
+        nextW = Math.max(10, Math.round(nextW));
+        nextH = Math.max(10, Math.round(nextH));
+        nextX = Math.round(nextX);
+        nextY = Math.round(nextY);
+
+        if (nodeId) {
+          useEditorStore.setState((s) => ({
+            document: {
+              ...s.document,
+              nodes: s.document.nodes.map((n) =>
+                n.id === nodeId
+                  ? {
+                      ...n,
+                      x: nextX,
+                      y: nextY,
+                      width: nextW,
+                      height: nextH,
+                      ...(n.type === "line"
+                        ? { x2: nextX + nextW, y2: nextY + nextH }
+                        : {}),
+                    }
+                  : n
+              ),
+            },
+          }));
+        }
+        return;
+      }
+
+      // 5. Handle dragging selected nodes
+      if (isDraggingNodesRef.current) {
+        const { startWorldPoint, initialPositions } = isDraggingNodesRef.current;
+        const dx = Math.round(worldPoint.x - startWorldPoint.x);
+        const dy = Math.round(worldPoint.y - startWorldPoint.y);
+
+        if (dx !== 0 || dy !== 0) {
+          isDraggingNodesRef.current.hasMoved = true;
+        }
+
+        const posMap = new Map(initialPositions.map((p) => [p.id, p]));
+        useEditorStore.setState((s) => ({
+          document: {
+            ...s.document,
+            nodes: s.document.nodes.map((n) => {
+              const init = posMap.get(n.id);
+              if (!init) return n;
+              if (n.type === "line" && init.x2 !== undefined && init.y2 !== undefined) {
+                return {
+                  ...n,
+                  x: init.x + dx,
+                  y: init.y + dy,
+                  x2: init.x2 + dx,
+                  y2: init.y2 + dy,
+                };
+              }
+              return { ...n, x: init.x + dx, y: init.y + dy };
+            }),
+          },
+        }));
+        return;
+      }
+
+      // 6. Handle marquee selection
+      if (isMarqueeRef.current) {
+        const { startWorldPoint, initialSelectedIds } = isMarqueeRef.current;
+        const mx = Math.min(startWorldPoint.x, worldPoint.x);
+        const my = Math.min(startWorldPoint.y, worldPoint.y);
+        const mw = Math.abs(worldPoint.x - startWorldPoint.x);
+        const mh = Math.abs(worldPoint.y - startWorldPoint.y);
+
+        setDragPreview({ x: mx, y: my, width: mw, height: mh });
+
+        const newlySelected = new Set(initialSelectedIds);
+        for (const node of document.nodes) {
+          if (!node.visible || node.locked) continue;
+          const nodeRight = node.x + node.width;
+          const nodeBottom = node.y + node.height;
+          const marqueeRight = mx + mw;
+          const marqueeBottom = my + mh;
+          const intersects =
+            node.x <= marqueeRight &&
+            nodeRight >= mx &&
+            node.y <= marqueeBottom &&
+            nodeBottom >= my;
+          if (intersects) {
+            newlySelected.add(node.id);
+          }
+        }
+        setSelectedIds(Array.from(newlySelected));
+        return;
+      }
+
+      // 7. Hover & Dynamic Cursor Updates in Select Mode
       if (activeTool === "select") {
-        const rect = container.getBoundingClientRect();
-        const screenPoint = {
-          x: e.clientX - rect.left,
-          y: e.clientY - rect.top,
-        };
-        const worldPoint = renderer.screenToWorld(screenPoint, document.camera);
-        const hitNode = renderer.hitTest(worldPoint, document);
-        setHoveredId(hitNode ? hitNode.id : null);
+        const handleHit = renderer.hitTestTransformHandle?.(
+          worldPoint,
+          document,
+          selectedIds
+        );
+        if (handleHit?.type === "rotate") {
+          setCursorOverride("crosshair");
+        } else if (handleHit?.type === "resize") {
+          const rot = handleHit.node ? handleHit.node.rotation : 0;
+          setCursorOverride(getResizeCursor(handleHit.handle, rot));
+        } else {
+          const hitNode = renderer.hitTest(worldPoint, document);
+          if (hitNode && selectedIds.has(hitNode.id)) {
+            setCursorOverride("move");
+          } else {
+            setCursorOverride(null);
+          }
+          setHoveredId(hitNode ? hitNode.id : null);
+        }
       }
     },
-    [activeTool, document, panBy, setHoveredId, setDragPreview]
+    [activeTool, document, selectedIds, panBy, setHoveredId, setDragPreview, setSelectedIds]
   );
 
   const handlePointerUp = useCallback(
@@ -434,7 +750,6 @@ export function CanvasStage() {
         let x = Math.min(startX, endWorld.x);
         let y = Math.min(startY, endWorld.y);
 
-        // If simple click without drag (distance < 5px), create default sized shape
         if (width < 5 && height < 5) {
           if (tool === "rectangle") {
             width = 180;
@@ -502,22 +817,100 @@ export function CanvasStage() {
           });
         }
 
-        // Add to document & command history
         executeCommand(new AddNode(newNode));
-
-        // Select the newly created shape
         setSelectedIds([newNode.id]);
-
-        // Clear drag preview and reset creating state
         setDragPreview(null);
         isCreatingShapeRef.current = null;
-
-        // Reset active tool back to select
         setActiveTool("select");
 
         try {
           e.currentTarget.releasePointerCapture(e.pointerId);
         } catch {}
+        return;
+      }
+
+      // 3. Finalize rotating node
+      if (isRotatingRef.current) {
+        const { nodeId, initialRotation } = isRotatingRef.current;
+        const currentDoc = useEditorStore.getState().document;
+        const finalNode = currentDoc.nodes.find((n) => n.id === nodeId);
+        if (finalNode && finalNode.rotation !== initialRotation) {
+          executeCommand(new RotateNode(nodeId, initialRotation, finalNode.rotation));
+        }
+        isRotatingRef.current = null;
+        try {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+        } catch {}
+        return;
+      }
+
+      // 4. Finalize resizing node
+      if (isResizingRef.current) {
+        const { nodeId, initialBounds } = isResizingRef.current;
+        if (nodeId) {
+          const currentDoc = useEditorStore.getState().document;
+          const finalNode = currentDoc.nodes.find((n) => n.id === nodeId);
+          if (finalNode) {
+            const nextBounds = {
+              x: finalNode.x,
+              y: finalNode.y,
+              width: finalNode.width,
+              height: finalNode.height,
+              x2: finalNode.type === "line" ? finalNode.x2 : undefined,
+              y2: finalNode.type === "line" ? finalNode.y2 : undefined,
+            };
+            if (
+              nextBounds.x !== initialBounds.x ||
+              nextBounds.y !== initialBounds.y ||
+              nextBounds.width !== initialBounds.width ||
+              nextBounds.height !== initialBounds.height
+            ) {
+              executeCommand(new ResizeNode(nodeId, initialBounds, nextBounds));
+            }
+          }
+        }
+        isResizingRef.current = null;
+        try {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+        } catch {}
+        return;
+      }
+
+      // 5. Finalize dragging nodes
+      if (isDraggingNodesRef.current) {
+        const { initialPositions, hasMoved } = isDraggingNodesRef.current;
+        if (hasMoved) {
+          const currentDoc = useEditorStore.getState().document;
+          const movements: { nodeId: string; dx: number; dy: number }[] = [];
+          for (const init of initialPositions) {
+            const node = currentDoc.nodes.find((n) => n.id === init.id);
+            if (node) {
+              const dx = node.x - init.x;
+              const dy = node.y - init.y;
+              if (dx !== 0 || dy !== 0) {
+                movements.push({ nodeId: node.id, dx, dy });
+              }
+            }
+          }
+          if (movements.length > 0) {
+            executeCommand(new MoveNodes(movements));
+          }
+        }
+        isDraggingNodesRef.current = null;
+        try {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+        } catch {}
+        return;
+      }
+
+      // 6. Finalize marquee selection
+      if (isMarqueeRef.current) {
+        setDragPreview(null);
+        isMarqueeRef.current = null;
+        try {
+          e.currentTarget.releasePointerCapture(e.pointerId);
+        } catch {}
+        return;
       }
     },
     [
@@ -534,6 +927,11 @@ export function CanvasStage() {
   const getCursor = () => {
     if (isPanning) return "cursor-grabbing";
     if (isSpacePressed || activeTool === "hand") return "cursor-grab";
+    if (cursorOverride) {
+      if (cursorOverride === "move") return "cursor-move";
+      if (cursorOverride === "crosshair") return "cursor-crosshair";
+      return "";
+    }
     if (activeTool === "select") return "cursor-default";
     if (activeTool === "text") return "cursor-text";
     if (
@@ -554,8 +952,10 @@ export function CanvasStage() {
 
   let inlineEditorStyle: React.CSSProperties | null = null;
   if (editingNode) {
-    const screenX = editingNode.x * document.camera.zoom + document.camera.x;
-    const screenY = editingNode.y * document.camera.zoom + document.camera.y;
+    const cx = viewportSize.width / 2;
+    const cy = viewportSize.height / 2;
+    const screenX = cx + document.camera.x + editingNode.x * document.camera.zoom;
+    const screenY = cy + document.camera.y + editingNode.y * document.camera.zoom;
     inlineEditorStyle = {
       position: "absolute",
       left: `${screenX}px`,
@@ -590,7 +990,10 @@ export function CanvasStage() {
       onPointerCancel={handlePointerUp}
       onContextMenu={(e) => e.preventDefault()}
       tabIndex={0}
-      style={{ outline: "none" }}
+      style={{
+        outline: "none",
+        cursor: cursorOverride && !isPanning ? cursorOverride : undefined,
+      }}
     >
       <canvas ref={canvasRef} className="block w-full h-full pointer-events-none" />
 

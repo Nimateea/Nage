@@ -12,6 +12,12 @@ export interface Rect {
   height: number;
 }
 
+export type ResizeHandle = "nw" | "n" | "ne" | "e" | "se" | "s" | "sw" | "w";
+
+export type TransformHitResult =
+  | { type: "resize"; handle: ResizeHandle; node?: CanvasNode; bounds: Rect }
+  | { type: "rotate"; node: CanvasNode; center: Point };
+
 export interface IRenderer {
   /**
    * Mount to an HTML5 <canvas> element and setup context
@@ -57,4 +63,13 @@ export interface IRenderer {
    * Compute bounding box enclosing an array of nodes in world space
    */
   computeBounds(nodes: CanvasNode[]): Rect | null;
+
+  /**
+   * Hit test a world coordinate against active transform handles (resize/rotation)
+   */
+  hitTestTransformHandle?(
+    worldPoint: Point,
+    doc: CanvasDocument,
+    selectedIds: Set<string>
+  ): TransformHitResult | null;
 }

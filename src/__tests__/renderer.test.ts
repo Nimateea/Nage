@@ -1,5 +1,8 @@
 import { describe, it, expect, beforeEach } from "vitest";
-import { Canvas2DRenderer } from "../lib/canvas/renderer/Canvas2DRenderer";
+import {
+  Canvas2DRenderer,
+  getResizeCursor,
+} from "../lib/canvas/renderer/Canvas2DRenderer";
 import { makeEmptyDocument, makeRectangle, makeEllipse } from "../lib/canvas/document/defaults";
 
 describe("Canvas2DRenderer camera & hit-test math", () => {
@@ -78,5 +81,58 @@ describe("Canvas2DRenderer camera & hit-test math", () => {
     expect(bounds?.y).toBe(20);
     expect(bounds?.width).toBe(190); // 200 - 10
     expect(bounds?.height).toBe(120); // 140 - 20
+  });
+
+  it("hit-tests 8 resize handles on selected node", () => {
+    const doc = makeEmptyDocument();
+    const rect = makeRectangle({ id: "rect-1", x: 100, y: 100, width: 200, height: 100 });
+    doc.nodes.push(rect);
+    const selectedIds = new Set(["rect-1"]);
+
+    // Test nw handle (100, 100)
+    const nwHit = renderer.hitTestTransformHandle({ x: 100, y: 100 }, doc, selectedIds);
+    expect(nwHit?.type).toBe("resize");
+    if (nwHit?.type === "resize") {
+      expect(nwHit.handle).toBe("nw");
+    }
+
+    // Test se handle (300, 200)
+    const seHit = renderer.hitTestTransformHandle({ x: 300, y: 200 }, doc, selectedIds);
+    expect(seHit?.type).toBe("resize");
+    if (seHit?.type === "resize") {
+      expect(seHit.handle).toBe("se");
+    }
+
+    // Test e handle (300, 150)
+    const eHit = renderer.hitTestTransformHandle({ x: 300, y: 150 }, doc, selectedIds);
+    expect(eHit?.type).toBe("resize");
+    if (eHit?.type === "resize") {
+      expect(eHit.handle).toBe("e");
+    }
+  });
+
+  it("hit-tests rotation handle above the top handle", () => {
+    const doc = makeEmptyDocument();
+    const rect = makeRectangle({ id: "rect-rot", x: 100, y: 100, width: 200, height: 100 });
+    doc.nodes.push(rect);
+    const selectedIds = new Set(["rect-rot"]);
+
+    // Rotation handle is at (x + width/2, y - 20) -> (200, 80)
+    const rotHit = renderer.hitTestTransformHandle({ x: 200, y: 80 }, doc, selectedIds);
+    expect(rotHit?.type).toBe("rotate");
+    if (rotHit?.type === "rotate") {
+      expect(rotHit.node.id).toBe("rect-rot");
+      expect(rotHit.center).toEqual({ x: 200, y: 150 });
+    }
+  });
+
+  it("maps resize cursors correctly based on handle and rotation", () => {
+    expect(getResizeCursor("n", 0)).toBe("ns-resize");
+    expect(getResizeCursor("e", 0)).toBe("ew-resize");
+    expect(getResizeCursor("nw", 0)).toBe("nwse-resize");
+    expect(getResizeCursor("ne", 0)).toBe("nesw-resize");
+
+    // Rotated 90 degrees: n becomes ew-resize
+    expect(getResizeCursor("n", 90)).toBe("ew-resize");
   });
 });

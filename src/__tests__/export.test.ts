@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import {
   computeExportBounds,
+  resolveNodesForExport,
   exportToSvg,
   exportToJson,
 } from "@/lib/canvas/export";
@@ -52,6 +53,51 @@ describe("Export Engine", () => {
       expect(bounds.minY).toBe(50);
       expect(bounds.width).toBe(200);
       expect(bounds.height).toBe(300);
+    });
+  });
+
+  describe("resolveNodesForExport", () => {
+    it("returns all visible nodes when selectedNodes is empty", () => {
+      const n1 = makeRectangle({ x: 0, y: 0, visible: true });
+      const n2 = makeRectangle({ x: 10, y: 10, visible: false });
+      const { nodes, bounds } = resolveNodesForExport([], [n1, n2]);
+      expect(nodes.length).toBe(1);
+      expect(nodes[0].id).toBe(n1.id);
+      expect(bounds).toBeDefined();
+    });
+
+    it("resolves frame and its child nodes even if children are not selected directly", () => {
+      const frame = makeFrame({ x: 100, y: 100, width: 400, height: 300 });
+      const child1 = makeRectangle({ x: 120, y: 120, width: 50, height: 50, parentId: frame.id });
+      const child2 = makeText({ x: 150, y: 150, content: "Child text", parentId: frame.id });
+      const outside = makeRectangle({ x: 800, y: 800, width: 100, height: 100, parentId: null });
+
+      // User selects only the frame
+      const { nodes, bounds } = resolveNodesForExport([frame], [frame, child1, child2, outside]);
+      expect(nodes.map((n) => n.id)).toEqual([frame.id, child1.id, child2.id]);
+      expect(bounds.minX).toBe(100);
+      expect(bounds.minY).toBe(100);
+      expect(bounds.width).toBe(400);
+      expect(bounds.height).toBe(300);
+    });
+
+    it("resolves child nodes referenced by childIds array on frame", () => {
+      const child = makeRectangle({ x: 200, y: 200, width: 60, height: 60 });
+      const frame = makeFrame({ x: 150, y: 150, width: 300, height: 200, childIds: [child.id] });
+
+      const { nodes } = resolveNodesForExport([frame], [frame, child]);
+      expect(nodes.length).toBe(2);
+      expect(nodes.some((n) => n.id === child.id)).toBe(true);
+    });
+
+    it("preserves document z-order when resolving export list", () => {
+      const f = makeFrame({ x: 0, y: 0, width: 500, height: 500 });
+      const b1 = makeRectangle({ x: 10, y: 10, parentId: f.id });
+      const b2 = makeRectangle({ x: 20, y: 20, parentId: f.id });
+      const docOrder = [f, b1, b2];
+
+      const { nodes } = resolveNodesForExport([b2, f], docOrder);
+      expect(nodes.map((n) => n.id)).toEqual([f.id, b1.id, b2.id]);
     });
   });
 

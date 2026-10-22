@@ -4,7 +4,13 @@ import React, { useState, useRef, useEffect } from "react";
 import Link from "next/link";
 import { useEditorStore } from "@/lib/canvas/store/editorStore";
 import { renameProjectAction } from "@/lib/supabase/projects";
-import { exportToPng, exportToSvg, exportToJson, downloadFile } from "@/lib/canvas/export";
+import {
+  exportToPng,
+  exportToSvg,
+  exportToJson,
+  downloadFile,
+  resolveNodesForExport,
+} from "@/lib/canvas/export";
 
 interface EditorHeaderProps {
   initialTitle: string;
@@ -70,7 +76,10 @@ export function EditorHeader({
   const handlePerformExport = async () => {
     const state = useEditorStore.getState();
     const selectedNodes = state.document.nodes.filter((n) => state.selectedIds.has(n.id));
-    const nodesToExport = selectedNodes.length > 0 ? selectedNodes : state.document.nodes;
+    const { nodes: nodesToExport, bounds: exportBounds } = resolveNodesForExport(
+      selectedNodes,
+      state.document.nodes
+    );
 
     if (nodesToExport.length === 0) {
       showToast("Nothing to export");
@@ -85,11 +94,11 @@ export function EditorHeader({
       const bgColor = includeBackground ? "#000000" : null;
 
       if (exportFormat === "png") {
-        const blob = await exportToPng(nodesToExport, exportScale, bgColor);
+        const blob = await exportToPng(nodesToExport, exportScale, bgColor, exportBounds);
         downloadFile(blob, `${cleanName}@${exportScale}x.png`, "image/png");
         showToast(`Exported ${cleanName}@${exportScale}x.png`);
       } else if (exportFormat === "svg") {
-        const svgStr = exportToSvg(nodesToExport, bgColor);
+        const svgStr = exportToSvg(nodesToExport, bgColor, exportBounds);
         downloadFile(svgStr, `${cleanName}.svg`, "image/svg+xml");
         showToast(`Exported ${cleanName}.svg`);
       } else if (exportFormat === "json") {

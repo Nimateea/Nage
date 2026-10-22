@@ -16,6 +16,66 @@ export interface ExportBounds {
   height: number;
 }
 
+/**
+ * Resolves nodes and bounding box for export.
+ * If nodes include frames, recursively resolves all child nodes belonging to those frames.
+ * If a single frame is selected, bounds are strictly locked to the frame boundaries.
+ */
+export function resolveNodesForExport(
+  selectedNodes: CanvasNode[],
+  allNodes: CanvasNode[]
+): { nodes: CanvasNode[]; bounds: ExportBounds } {
+  const activeNodes = selectedNodes.length > 0 ? selectedNodes : allNodes;
+  const nodeMap = new Map<string, CanvasNode>(allNodes.map((n) => [n.id, n]));
+  const includedIds = new Set<string>();
+
+  const includeNodeAndChildren = (node: CanvasNode) => {
+    includedIds.add(node.id);
+    if (node.type === "frame") {
+      const frame = node as FrameNode;
+      if (Array.isArray(frame.childIds)) {
+        for (const childId of frame.childIds) {
+          const child = nodeMap.get(childId);
+          if (child && !includedIds.has(child.id)) {
+            includeNodeAndChildren(child);
+          }
+        }
+      }
+      for (const n of allNodes) {
+        if (n.parentId === frame.id && !includedIds.has(n.id)) {
+          includeNodeAndChildren(n);
+        }
+      }
+    }
+  };
+
+  for (const n of activeNodes) {
+    includeNodeAndChildren(n);
+  }
+
+  // Preserve document z-order
+  const resolvedNodes = allNodes.filter((n) => includedIds.has(n.id) && n.visible);
+
+  // If exporting a single frame, bounds are exact frame coordinates
+  if (selectedNodes.length === 1 && selectedNodes[0].type === "frame") {
+    const f = selectedNodes[0] as FrameNode;
+    return {
+      nodes: resolvedNodes,
+      bounds: {
+        minX: f.x,
+        minY: f.y,
+        width: Math.max(20, f.width),
+        height: Math.max(20, f.height),
+      },
+    };
+  }
+
+  return {
+    nodes: resolvedNodes,
+    bounds: computeExportBounds(resolvedNodes),
+  };
+}
+
 export function computeExportBounds(nodes: CanvasNode[]): ExportBounds {
   if (nodes.length === 0) {
     return { minX: 0, minY: 0, width: 800, height: 600 };
@@ -54,9 +114,10 @@ export function computeExportBounds(nodes: CanvasNode[]): ExportBounds {
 export async function exportToPng(
   nodes: CanvasNode[],
   scale: 1 | 2 | 3 = 1,
-  backgroundColor: string | null = "#000000"
+  backgroundColor: string | null = "#000000",
+  customBounds?: ExportBounds
 ): Promise<Blob> {
-  const bounds = computeExportBounds(nodes);
+  const bounds = customBounds || computeExportBounds(nodes);
   const canvas = document.createElement("canvas");
   const width = Math.ceil(bounds.width * scale);
   const height = Math.ceil(bounds.height * scale);
@@ -98,10 +159,10 @@ export async function exportToPng(
   ctx.scale(scale, scale);
   ctx.translate(-bounds.minX, -bounds.minY);
 
-  // Render each visible node in z-order
+  // Render each visible node in z-order (pass isExport: true to omit frame editor label)
   for (const node of nodes) {
     if (node.visible) {
-      renderNode(ctx, node, 1);
+      renderNode(ctx, node, 1, undefined, true);
     }
   }
 
@@ -129,9 +190,10 @@ function escapeXml(str: string): string {
 
 export function exportToSvg(
   nodes: CanvasNode[],
-  backgroundColor: string | null = "#000000"
+  backgroundColor: string | null = "#000000",
+  customBounds?: ExportBounds
 ): string {
-  const bounds = computeExportBounds(nodes);
+  const bounds = customBounds || computeExportBounds(nodes);
   const w = Math.round(bounds.width);
   const h = Math.round(bounds.height);
 
@@ -200,8 +262,8 @@ export function exportToSvg(
         const rx = frameNode.cornerRadius ? ` rx="${frameNode.cornerRadius}"` : "";
         parts.push(
           `    <g id="${frameNode.id}">` +
+            `      <title>${escapeXml(frameNode.name)}</title>` +
             `      <rect x="${frameNode.x}" y="${frameNode.y}" width="${frameNode.width}" height="${frameNode.height}" fill="${fill}" stroke="${stroke}" stroke-width="1"${rx}${rot}${opacity} />` +
-            `      <text x="${frameNode.x}" y="${frameNode.y - 6}" font-family="Inter, sans-serif" font-size="11" fill="#888888">${escapeXml(frameNode.name)}</text>` +
             `    </g>`
         );
         break;

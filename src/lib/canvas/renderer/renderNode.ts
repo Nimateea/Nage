@@ -191,7 +191,12 @@ export function renderText(ctx: CanvasRenderingContext2D, node: TextNode) {
   });
 }
 
-export function renderFrame(ctx: CanvasRenderingContext2D, node: FrameNode, zoom: number) {
+export function renderFrame(
+  ctx: CanvasRenderingContext2D,
+  node: FrameNode,
+  zoom: number,
+  showLabel: boolean = true
+) {
   // Frame background
   drawRoundedRect(ctx, 0, 0, node.width, node.height, node.cornerRadius);
   if (node.fill.type !== "none") {
@@ -213,13 +218,15 @@ export function renderFrame(ctx: CanvasRenderingContext2D, node: FrameNode, zoom
   ctx.restore();
 
   // Frame title label above frame: matches prototype `.fl`
-  ctx.save();
-  const fontSize = 11 / zoom;
-  ctx.font = `400 ${Math.max(9, fontSize)}px Inter, sans-serif`;
-  ctx.fillStyle = "#888888";
-  ctx.textBaseline = "bottom";
-  ctx.fillText(node.name, 0, -4 / zoom);
-  ctx.restore();
+  if (showLabel) {
+    ctx.save();
+    const fontSize = 11 / zoom;
+    ctx.font = `400 ${Math.max(9, fontSize)}px Inter, sans-serif`;
+    ctx.fillStyle = "#888888";
+    ctx.textBaseline = "bottom";
+    ctx.fillText(node.name, 0, -4 / zoom);
+    ctx.restore();
+  }
 }
 
 export function renderImage(
@@ -249,7 +256,8 @@ export function renderNode(
   ctx: CanvasRenderingContext2D,
   node: CanvasNode,
   zoom: number,
-  requestRerender?: () => void
+  requestRerender?: () => void,
+  isExport: boolean = false
 ) {
   if (!node.visible) return;
 
@@ -282,7 +290,7 @@ export function renderNode(
       renderText(ctx, node);
       break;
     case "frame":
-      renderFrame(ctx, node, zoom);
+      renderFrame(ctx, node, zoom, !isExport);
       break;
     case "image":
       renderImage(ctx, node, requestRerender);

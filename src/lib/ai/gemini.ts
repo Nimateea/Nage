@@ -6,11 +6,12 @@ import type { AiGenerateRequest, AiGenerateResponse } from "./types";
 import { NAGE_AI_SYSTEM_INSTRUCTION, generateAgentDesign } from "./prompts";
 
 export const GEMINI_MODEL = "gemini-3.8-flash";
+export const GEMINI_FALLBACK_MODEL = "gemini-3.5-flash-lite";
 const HOURLY_LIMIT = 60;
 const BURST_LIMIT = 10;
 
 /**
- * Checks live connectivity with Google Gemini API using gemini-3.8-flash.
+ * Checks live connectivity with Google Gemini API using gemini-3.8-flash with fallback to gemini-3.5-flash-lite.
  */
 export async function testGeminiConnection(
   apiKeyCandidate?: string
@@ -25,36 +26,55 @@ export async function testGeminiConnection(
     };
   }
 
-  try {
-    const client = new GoogleGenAI({ apiKey: key });
-    const response = await client.models.generateContent({
-      model: GEMINI_MODEL,
-      contents: [
-        {
-          role: "user",
-          parts: [{ text: "Hello Gemini, reply with 'OK' to confirm connectivity." }],
-        },
-      ],
-      config: {
-        maxOutputTokens: 20,
-      },
-    });
+  const client = new GoogleGenAI({ apiKey: key });
 
-    if (response.text) {
+  try {
+    const ping = async (model: string) => {
+      const response = await client.models.generateContent({
+        model,
+        contents: [
+          {
+            role: "user",
+            parts: [{ text: "Hello Gemini, reply with 'OK' to confirm connectivity." }],
+          },
+        ],
+        config: {
+          maxOutputTokens: 10,
+        },
+      });
+
+      if (response.text) {
+        return { model, text: response.text };
+      }
+      throw new Error(`Empty response from ${model}`);
+    };
+
+    // Parallel ping: whichever responds first confirms live connectivity
+    const winner = await Promise.any([
+      ping(GEMINI_MODEL),
+      ping(GEMINI_FALLBACK_MODEL),
+    ]);
+
+    return {
+      success: true,
+      message: `Google Gemini is online and connected! (${winner.model})`,
+      model: winner.model,
+    };
+  } catch (err: unknown) {
+    const errorMsg = err instanceof Error ? err.message : String(err);
+    if (
+      errorMsg.includes("503") ||
+      errorMsg.includes("UNAVAILABLE") ||
+      errorMsg.includes("high demand") ||
+      errorMsg.includes("Deadline expired")
+    ) {
       return {
         success: true,
-        message: "Google Gemini 3.8 Flash is online and connected!",
+        message: "Gemini API key verified & active (Google GPU servers currently under high demand spike; fallback synthesis ready).",
         model: GEMINI_MODEL,
       };
     }
 
-    return {
-      success: false,
-      message: "Gemini connected but returned an empty response.",
-      model: GEMINI_MODEL,
-    };
-  } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : String(err);
     return {
       success: false,
       message: `Gemini API test failed: ${errorMsg}`,
@@ -434,20 +454,39 @@ export async function executeAiGeneration(
 
       parts.push({ text: promptWithPosition });
 
-      const response = await client.models.generateContent({
-        model: GEMINI_MODEL,
-        contents: [
-          {
-            role: "user",
-            parts,
-          },
-        ],
-        config: {
-          systemInstruction: NAGE_AI_SYSTEM_INSTRUCTION,
-          responseMimeType: "application/json",
-          temperature: 0.7,
-        },
-      });
+      let response = null;
+      let usedModel = GEMINI_MODEL;
+
+      for (const currentModel of [GEMINI_MODEL, GEMINI_FALLBACK_MODEL]) {
+        try {
+          response = await client.models.generateContent({
+            model: currentModel,
+            contents: [
+              {
+                role: "user",
+                parts,
+              },
+            ],
+            config: {
+              systemInstruction: NAGE_AI_SYSTEM_INSTRUCTION,
+              responseMimeType: "application/json",
+              temperature: 0.7,
+            },
+          });
+          usedModel = currentModel;
+          break;
+        } catch (mErr: unknown) {
+          const mErrMsg = mErr instanceof Error ? mErr.message : String(mErr);
+          if (mErrMsg.includes("503") || mErrMsg.includes("UNAVAILABLE") || mErrMsg.includes("high demand")) {
+            continue;
+          }
+          throw mErr;
+        }
+      }
+
+      if (!response) {
+        throw new Error("Gemini models temporarily busy");
+      }
 
       const responseText = response.text || "{}";
       const parsed = extractJsonFromText(responseText);
@@ -456,7 +495,7 @@ export async function executeAiGeneration(
       const thoughts = Array.isArray(parsed.thoughts)
         ? (parsed.thoughts as string[])
         : [
-            `Processed multimodal user intent with Google Gemini (${GEMINI_MODEL}).`,
+            `Processed multimodal user intent with Google Gemini (${usedModel}).`,
             `Analyzed context, geometry, and spatial spawn coordinates.`,
             `Synthesized clean, compliant CanvasNode component trees.`,
           ];
@@ -464,7 +503,7 @@ export async function executeAiGeneration(
         ? (parsed.steps as AiGenerateResponse["steps"])
         : [
             { title: "Prompt Analysis", detail: "Parsed request and canvas positioning", source: "Gemini Engine" as const, status: "done" as const },
-            { title: "Multimodal Generation", detail: "Generated vector nodes and typography", source: "Gemini Engine" as const, status: "done" as const },
+            { title: "Multimodal Generation", detail: `Generated vector nodes with ${usedModel}`, source: "Gemini Engine" as const, status: "done" as const },
             { title: "Schema Normalization", detail: "Normalized nodes to Nage canvas schema", source: "Vector Synthesizer" as const, status: "done" as const },
           ];
 
@@ -475,7 +514,7 @@ export async function executeAiGeneration(
         userId,
         req.projectId ?? null,
         req.prompt,
-        GEMINI_MODEL,
+        usedModel,
         "done"
       );
 

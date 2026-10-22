@@ -19,6 +19,7 @@ import {
   exportToSvg,
   exportToJson,
   downloadFile,
+  resolveNodesForExport,
 } from "@/lib/canvas/export";
 
 const FRAME_PRESETS = [
@@ -70,7 +71,12 @@ export function PropertiesPanel() {
 
   if (selectedNodes.length === 0) return null;
 
-  const handleExport = async (nodesToExport: CanvasNode[], baseName: string) => {
+  const handleExport = async (rawNodesToExport: CanvasNode[], baseName: string) => {
+    const { nodes: nodesToExport, bounds: exportBounds } = resolveNodesForExport(
+      rawNodesToExport,
+      document.nodes
+    );
+
     if (nodesToExport.length === 0) {
       showToast("Nothing to export");
       return;
@@ -79,11 +85,11 @@ export function PropertiesPanel() {
     try {
       const cleanName = baseName.trim().replace(/[^a-zA-Z0-9_-]/g, "_") || "export";
       if (exportFormat === "png") {
-        const blob = await exportToPng(nodesToExport, exportScale, "#000000");
+        const blob = await exportToPng(nodesToExport, exportScale, "#000000", exportBounds);
         downloadFile(blob, `${cleanName}@${exportScale}x.png`, "image/png");
         showToast(`Exported ${cleanName}@${exportScale}x.png`);
       } else if (exportFormat === "svg") {
-        const svgStr = exportToSvg(nodesToExport, "#000000");
+        const svgStr = exportToSvg(nodesToExport, "#000000", exportBounds);
         downloadFile(svgStr, `${cleanName}.svg`, "image/svg+xml");
         showToast(`Exported ${cleanName}.svg`);
       } else if (exportFormat === "json") {

@@ -1,6 +1,8 @@
 import { NextResponse } from "next/server";
 import { testGeminiConnection } from "@/lib/ai/gemini";
 
+export const maxDuration = 60;
+
 export async function GET(request: Request) {
   const url = new URL(request.url);
   const keyParam = url.searchParams.get("key") || undefined;

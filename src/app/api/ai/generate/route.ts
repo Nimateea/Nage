@@ -3,6 +3,8 @@ import { getSupabaseServerClient } from "@/lib/supabase/server";
 import { executeAiGeneration } from "@/lib/ai/gemini";
 import type { AiGenerateRequest } from "@/lib/ai/types";
 
+export const maxDuration = 60;
+
 export async function POST(request: Request) {
   try {
     const body = (await request.json()) as AiGenerateRequest;

@@ -51,11 +51,15 @@ export function ProjectGrid({
 
   // Actions
   const handleCreate = async (name?: string, prompt?: string) => {
-    const newProject = await createProjectAction(name, prompt);
-    setProjects([newProject, ...projects]);
-    setShowPrompt(false);
-    // Navigate straight to project canvas
-    router.push(`/dashboard/${newProject.id}`);
+    try {
+      const newProject = await createProjectAction(name, prompt);
+      setProjects([newProject, ...projects]);
+      setShowPrompt(false);
+      // Navigate straight to project canvas
+      router.push(`/dashboard/${newProject.id}`);
+    } catch (err) {
+      console.error("Failed to create project:", err);
+    }
   };
 
   const handleRename = async (id: string, newName: string) => {

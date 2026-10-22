@@ -7,11 +7,35 @@ import { makeEmptyDocument } from "../canvas/document/defaults";
 
 export type Project = Tables<"projects">;
 
+// Helper to guarantee a row exists in public.profiles to satisfy foreign keys
+async function ensureUserProfile(
+  supabase: Awaited<ReturnType<typeof getSupabaseServerClient>>,
+  user: { id: string; email?: string; user_metadata?: Record<string, unknown> }
+) {
+  const displayName =
+    (user.user_metadata?.full_name as string | undefined) ??
+    user.email?.split("@")[0] ??
+    "User";
+  const avatarUrl =
+    (user.user_metadata?.avatar_url as string | undefined) ?? null;
+
+  await supabase.from("profiles").upsert(
+    {
+      id: user.id,
+      display_name: displayName,
+      avatar_url: avatarUrl,
+    },
+    { onConflict: "id" }
+  );
+}
+
 // ── List user's projects ───────────────────────────────────────────────────────
 export async function getProjectsAction(): Promise<Project[]> {
   const supabase = await getSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return [];
+
+  await ensureUserProfile(supabase, user);
 
   const { data, error } = await supabase
     .from("projects")
@@ -32,6 +56,9 @@ export async function createProjectAction(name?: string, prompt?: string) {
   const supabase = await getSupabaseServerClient();
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error("Unauthorized");
+
+  // Ensure profile row exists to prevent foreign key constraint violations
+  await ensureUserProfile(supabase, user);
 
   const title = (name && name.trim()) || "Untitled";
 

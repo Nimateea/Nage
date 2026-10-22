@@ -139,7 +139,11 @@ export function NewProjectPrompt({ onBack, onCreate }: NewProjectPromptProps) {
       </div>
 
       {/* Action Cards */}
-      <div className="flex justify-center items-center gap-3 mt-4 w-full max-w-[640px]">
+      <div
+        className={`flex justify-center items-center gap-3 mt-4 w-full max-w-[640px] transition-opacity ${
+          isCreating ? "opacity-50 pointer-events-none" : ""
+        }`}
+      >
         {/* Illustrations */}
         <div
           onClick={() => handleSubmit("Illustration Project")}

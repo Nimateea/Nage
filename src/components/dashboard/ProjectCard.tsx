@@ -2,7 +2,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
-import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { formatRelativeTime } from "@/lib/utils/time";
 import type { Project } from "@/lib/supabase/projects";
 
@@ -19,6 +19,7 @@ export function ProjectCard({
   onDuplicate,
   onDelete,
 }: ProjectCardProps) {
+  const router = useRouter();
   const [menuOpen, setMenuOpen] = useState(false);
   const [isEditing, setIsEditing] = useState(false);
   const [name, setName] = useState(project.name);
@@ -59,28 +60,33 @@ export function ProjectCard({
     setMenuOpen(false);
   };
 
+  const handleCardClick = () => {
+    if (isEditing) return;
+    router.push(`/dashboard/${project.id}`);
+  };
+
   return (
-    <div className="relative group bg-[#0D0D0D] hover:bg-[#151515] rounded-[16px] p-2 transition-all cursor-pointer">
-      {/* Clickable Card Link to Editor */}
-      <Link href={`/dashboard/${project.id}`} className="block">
-        {/* Thumbnail Box */}
-        <div className="h-[120px] rounded-[12px] bg-[#0A0A0A] overflow-hidden flex items-center justify-center border border-[#1A1A1A]">
-          {project.thumbnail_url ? (
-            <img
-              src={project.thumbnail_url}
-              alt={project.name}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="flex flex-col items-center justify-center gap-1.5 opacity-25 group-hover:opacity-40 transition-opacity">
-              <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
-                <rect x="3" y="3" width="18" height="18" rx="2" />
-                <path d="M3 15l6-6 4 4 8-8" />
-              </svg>
-            </div>
-          )}
-        </div>
-      </Link>
+    <div
+      onClick={handleCardClick}
+      className="relative group bg-[#0D0D0D] hover:bg-[#151515] rounded-[16px] p-2 transition-all cursor-pointer"
+    >
+      {/* Thumbnail Box */}
+      <div className="h-[120px] rounded-[12px] bg-[#0A0A0A] overflow-hidden flex items-center justify-center border border-[#1A1A1A]">
+        {project.thumbnail_url ? (
+          <img
+            src={project.thumbnail_url}
+            alt={project.name}
+            className="w-full h-full object-cover"
+          />
+        ) : (
+          <div className="flex flex-col items-center justify-center gap-1.5 opacity-25 group-hover:opacity-40 transition-opacity">
+            <svg width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5">
+              <rect x="3" y="3" width="18" height="18" rx="2" />
+              <path d="M3 15l6-6 4 4 8-8" />
+            </svg>
+          </div>
+        )}
+      </div>
 
       {/* Info Row */}
       <div className="mt-2.5 px-1 pb-1">

@@ -202,3 +202,49 @@ export async function deleteProjectAction(projectId: string) {
 
   revalidatePath("/dashboard");
 }
+
+// ── Save project document ──────────────────────────────────────────────────────
+export async function saveProjectDocumentAction(
+  projectId: string,
+  document: Record<string, unknown>
+) {
+  const supabase = await getSupabaseServerClient();
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) throw new Error("Unauthorized");
+
+  // Ensure profile row exists
+  await ensureUserProfile(supabase, user);
+
+  // Soft size guard (5 MB)
+  const docStr = JSON.stringify(document);
+  if (docStr.length > 5 * 1024 * 1024) {
+    throw new Error("Document exceeds 5MB size limit");
+  }
+
+  const { error } = await supabase
+    .from("project_documents")
+    .upsert(
+      {
+        project_id: projectId,
+        owner_id: user.id,
+        document: document as unknown as Json,
+        version: (document.version as number) || 1,
+        updated_at: new Date().toISOString(),
+      },
+      { onConflict: "project_id" }
+    );
+
+  if (error) {
+    console.error("Failed to save project document:", error);
+    throw new Error(error.message);
+  }
+
+  // Update project updated_at timestamp
+  await supabase
+    .from("projects")
+    .update({ updated_at: new Date().toISOString() })
+    .eq("id", projectId)
+    .eq("owner_id", user.id);
+
+  return { success: true };
+}

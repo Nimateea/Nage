@@ -4,6 +4,7 @@ import React, { useState, useRef } from "react";
 import Link from "next/link";
 import { useEditorStore } from "@/lib/canvas/store/editorStore";
 import { renameProjectAction } from "@/lib/supabase/projects";
+import { exportToPng, downloadFile } from "@/lib/canvas/export";
 
 interface EditorHeaderProps {
   initialTitle: string;
@@ -22,6 +23,8 @@ export function EditorHeader({
 
   const showToast = useEditorStore((state) => state.showToast);
   const setProjectName = useEditorStore((state) => state.setProjectName);
+  const saveStatus = useEditorStore((state) => state.saveStatus);
+  const lastSavedAt = useEditorStore((state) => state.lastSavedAt);
 
   const handleTitleSubmit = async () => {
     setIsEditing(false);
@@ -42,6 +45,34 @@ export function EditorHeader({
       showToast("Link copied to clipboard");
     } else {
       showToast("Failed to copy link");
+    }
+  };
+
+  const [isExporting, setIsExporting] = useState(false);
+
+  const handleQuickExport = async () => {
+    const state = useEditorStore.getState();
+    const selectedNodes = state.document.nodes.filter((n) => state.selectedIds.has(n.id));
+    const nodesToExport = selectedNodes.length > 0 ? selectedNodes : state.document.nodes;
+
+    if (nodesToExport.length === 0) {
+      showToast("Nothing to export");
+      return;
+    }
+
+    setIsExporting(true);
+    try {
+      showToast("Generating export…");
+      const name = (selectedNodes.length === 1 ? selectedNodes[0].name : state.projectName) || "export";
+      const cleanName = name.trim().replace(/[^a-zA-Z0-9_-]/g, "_");
+      const blob = await exportToPng(nodesToExport, 2, "#000000");
+      downloadFile(blob, `${cleanName}@2x.png`, "image/png");
+      showToast(`Exported ${cleanName}@2x.png`);
+    } catch (err) {
+      console.error("Export error:", err);
+      showToast("Export failed");
+    } finally {
+      setIsExporting(false);
     }
   };
 
@@ -111,17 +142,56 @@ export function EditorHeader({
             </span>
           )}
           <span className="text-[#555555] text-[13px]">Moodboard</span>
+
+          {/* Cloud Save Icon (just an icon, no text attached) */}
+          <div
+            className="flex items-center ml-1.5 transition-colors duration-200"
+            title={
+              saveStatus === "saved"
+                ? lastSavedAt
+                  ? `Saved to cloud at ${new Date(lastSavedAt).toLocaleTimeString()}`
+                  : "All changes saved to cloud"
+                : saveStatus === "saving"
+                ? "Saving to cloud…"
+                : "Unsaved changes"
+            }
+          >
+            <svg
+              width="16"
+              height="16"
+              viewBox="0 0 24 24"
+              fill="none"
+              stroke="currentColor"
+              strokeWidth="2"
+              strokeLinecap="round"
+              strokeLinejoin="round"
+              className={`transition-colors duration-300 ${
+                saveStatus === "saved"
+                  ? "text-[#00E676]" // Active: green
+                  : saveStatus === "saving"
+                  ? "text-[#00E676] animate-pulse" // Saving: green pulsing
+                  : "text-[#666666]" // Not saving: grey
+              }`}
+            >
+              <path d="M17.5 19H9a7 7 0 1 1 6.71-9h1.79a4.5 4.5 0 1 1 0 9Z" />
+              {saveStatus === "saved" && (
+                <polyline points="9 13 11 15 15 11" strokeWidth="2" />
+              )}
+            </svg>
+          </div>
         </div>
       </div>
 
       {/* Right Side Buttons */}
-      <div className="flex items-center gap-4 pointer-events-auto">
-        {/* AI Button */}
+      <div className="flex items-center gap-3 pointer-events-auto">
+        {/* Quick Export Button */}
         <button
-          id="btn-ai"
+          id="btn-quick-export"
           type="button"
-          onClick={() => showToast("AI assistant will be connected in Step 12")}
-          className="bg-[#111111] hover:bg-[#1A1A1A] border border-[#1f1f1f] rounded-full px-4 py-2 flex items-center gap-2 text-white text-[13px] transition-colors cursor-pointer"
+          disabled={isExporting}
+          onClick={handleQuickExport}
+          className="bg-[#111111] hover:bg-[#1A1A1A] border border-[#1f1f1f] rounded-full px-4 py-2 flex items-center gap-2 text-white text-[13px] transition-colors cursor-pointer disabled:opacity-50"
+          title="Quick Export PNG (2x)"
         >
           <svg
             width="14"
@@ -133,10 +203,11 @@ export function EditorHeader({
             strokeLinecap="round"
             strokeLinejoin="round"
           >
-            <path d="M12 3l1.9 5.1L19 10l-5.1 1.9L12 17l-1.9-5.1L5 10l5.1-1.9z" />
-            <path d="M19 16v4M17 18h4" />
+            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4" />
+            <polyline points="7 10 12 15 17 10" />
+            <line x1="12" y1="15" x2="12" y2="3" />
           </svg>
-          AI
+          {isExporting ? "Exporting…" : "Export"}
         </button>
 
         {/* Share Button */}

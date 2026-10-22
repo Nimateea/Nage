@@ -18,6 +18,15 @@ export type TransformHitResult =
   | { type: "resize"; handle: ResizeHandle; node?: CanvasNode; bounds: Rect }
   | { type: "rotate"; node: CanvasNode; center: Point };
 
+export interface RemoteCursor {
+  id: string;
+  name: string;
+  x: number;
+  y: number;
+  color: string;
+  lastSeen: number;
+}
+
 export interface IRenderer {
   /**
    * Mount to an HTML5 <canvas> element and setup context
@@ -36,7 +45,8 @@ export interface IRenderer {
     doc: CanvasDocument,
     selectedIds: Set<string>,
     hoveredId?: string | null,
-    dragPreview?: Rect | null
+    dragPreview?: Rect | null,
+    remoteCursors?: Record<string, RemoteCursor>
   ): void;
 
   /**

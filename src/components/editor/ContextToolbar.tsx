@@ -34,11 +34,39 @@ export function ContextToolbar() {
   const currentFontSize = isText ? (selectedNode as TextNode).fontSize || 16 : 16;
   const currentWeight = isText ? (selectedNode as TextNode).fontWeight : 400;
   const currentAlign = isText ? (selectedNode as TextNode).textAlign : "left";
+  const currentFontFamily = isText ? (selectedNode as TextNode).fontFamily || "Inter, sans-serif" : "";
+  const currentCornerRadius =
+    "cornerRadius" in selectedNode
+      ? (selectedNode as { cornerRadius?: number }).cornerRadius || 0
+      : 0;
 
   return (
     <div className="fixed top-[84px] left-1/2 transform -translate-x-1/2 z-20 bg-[#111111] border border-[#222222] rounded-full px-4 py-2 flex items-center gap-3 shadow-[0_10px_30px_rgba(0,0,0,0.5)] select-none text-[13px] text-white">
       {isText && (
         <>
+          {/* Font Family */}
+          <select
+            value={currentFontFamily}
+            onChange={(e) => {
+              const fam = e.target.value;
+              updateNode((n) => (n.type === "text" ? { ...n, fontFamily: fam } : n));
+            }}
+            className="bg-transparent text-[#A0A0A0] hover:text-white text-xs outline-none cursor-pointer max-w-[110px]"
+          >
+            <option value="Inter, sans-serif" className="bg-[#111111] text-white">Inter</option>
+            <option value="Roboto, sans-serif" className="bg-[#111111] text-white">Roboto</option>
+            <option value="-apple-system, BlinkMacSystemFont, sans-serif" className="bg-[#111111] text-white">SF Pro</option>
+            <option value="'Playfair Display', serif" className="bg-[#111111] text-white">Playfair</option>
+            <option value="'Space Grotesk', sans-serif" className="bg-[#111111] text-white">Space Grotesk</option>
+            <option value="Montserrat, sans-serif" className="bg-[#111111] text-white">Montserrat</option>
+            <option value="Poppins, sans-serif" className="bg-[#111111] text-white">Poppins</option>
+            <option value="'Fira Code', monospace" className="bg-[#111111] text-white">Fira Code</option>
+            <option value="Georgia, serif" className="bg-[#111111] text-white">Georgia</option>
+            <option value='"Gegola DEMO", sans-serif' className="bg-[#111111] text-white">Gegola</option>
+          </select>
+
+          <div className="w-[1px] h-4 bg-[#333333]" />
+
           {/* Font size - */}
           <button
             type="button"
@@ -192,6 +220,28 @@ export function ContextToolbar() {
               Square (1080 × 1080)
             </option>
           </select>
+
+          {/* Corner Radius control */}
+          {(selectedNode.type === "rectangle" || selectedNode.type === "frame") && (
+            <div className="flex items-center gap-1 text-[#A0A0A0] text-xs" title="Corner Radius">
+              <span>◜</span>
+              <input
+                type="number"
+                min="0"
+                max="120"
+                value={currentCornerRadius}
+                onChange={(e) => {
+                  const rad = Math.max(0, Number(e.target.value));
+                  updateNode((n) =>
+                    n.type === "rectangle" || n.type === "frame"
+                      ? { ...n, cornerRadius: rad }
+                      : n
+                  );
+                }}
+                className="w-8 bg-[#1A1A1A] text-white text-xs px-1 py-0.5 rounded outline-none border border-[#333333] text-center"
+              />
+            </div>
+          )}
         </>
       )}
 

@@ -104,9 +104,15 @@ export function makeText(overrides: Partial<TextNode> = {}): TextNode {
     parentId: null,
     content: "Text",
     fontSize: 16,
+    fontFamily: "Inter, sans-serif",
     fontWeight: 400,
     color: "#000000",
     textAlign: "left",
+    verticalAlign: "top",
+    lineHeight: "auto",
+    letterSpacing: 0,
+    textDecoration: "none",
+    textCase: "none",
     ...overrides,
   };
 }

@@ -80,9 +80,16 @@ export type TextNode = NodeBase & {
   type: "text";
   content: string;
   fontSize: number;
-  fontWeight: 400 | 500 | 600 | 700;
+  fontFamily?: string;
+  fontWeight: number; // 100 to 900
   color: string;
-  textAlign: "left" | "center" | "right";
+  textAlign: "left" | "center" | "right" | "justify";
+  verticalAlign?: "top" | "middle" | "bottom";
+  lineHeight?: number | "auto";
+  letterSpacing?: number; // px
+  paragraphSpacing?: number; // px
+  textDecoration?: "none" | "underline" | "line-through";
+  textCase?: "none" | "uppercase" | "lowercase" | "capitalize";
 };
 
 export type FrameNode = NodeBase & {

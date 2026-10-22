@@ -132,20 +132,62 @@ export function renderLine(ctx: CanvasRenderingContext2D, node: LineNode) {
 }
 
 export function renderText(ctx: CanvasRenderingContext2D, node: TextNode) {
-  ctx.font = `${node.fontWeight} ${node.fontSize}px Inter, sans-serif`;
+  const fontFam = node.fontFamily || "Inter, -apple-system, sans-serif";
+  const weight = node.fontWeight || 400;
+  ctx.font = `${weight} ${node.fontSize}px ${fontFam}`;
   ctx.fillStyle = node.color;
-  ctx.textAlign = node.textAlign;
+  ctx.textAlign = node.textAlign === "justify" ? "left" : (node.textAlign || "left");
   ctx.textBaseline = "top";
 
-  const lines = node.content.split("\n");
-  const lineHeight = node.fontSize * 1.25;
+  if (node.letterSpacing && "letterSpacing" in ctx) {
+    (ctx as unknown as { letterSpacing: string }).letterSpacing = `${node.letterSpacing}px`;
+  }
+
+  let textContent = node.content;
+  if (node.textCase === "uppercase") {
+    textContent = textContent.toUpperCase();
+  } else if (node.textCase === "lowercase") {
+    textContent = textContent.toLowerCase();
+  } else if (node.textCase === "capitalize") {
+    textContent = textContent.replace(/\b\w/g, (c) => c.toUpperCase());
+  }
+
+  const lines = textContent.split("\n");
+  const calculatedLineHeight =
+    typeof node.lineHeight === "number" && node.lineHeight > 0
+      ? node.lineHeight
+      : node.fontSize * 1.25;
 
   let startX = 0;
   if (node.textAlign === "center") startX = node.width / 2;
   else if (node.textAlign === "right") startX = node.width;
 
   lines.forEach((line, index) => {
-    ctx.fillText(line, startX, index * lineHeight);
+    const y = index * calculatedLineHeight;
+    ctx.fillText(line, startX, y);
+
+    // Text decoration: underline or line-through
+    if (node.textDecoration === "underline" || node.textDecoration === "line-through") {
+      ctx.save();
+      const metrics = ctx.measureText(line);
+      const strokeW = Math.max(1, node.fontSize / 14);
+      let lineX = startX;
+      if (node.textAlign === "center") lineX = startX - metrics.width / 2;
+      else if (node.textAlign === "right") lineX = startX - metrics.width;
+
+      const lineY =
+        node.textDecoration === "underline"
+          ? y + node.fontSize * 1.1
+          : y + node.fontSize * 0.55;
+
+      ctx.beginPath();
+      ctx.strokeStyle = node.color;
+      ctx.lineWidth = strokeW;
+      ctx.moveTo(lineX, lineY);
+      ctx.lineTo(lineX + metrics.width, lineY);
+      ctx.stroke();
+      ctx.restore();
+    }
   });
 }
 

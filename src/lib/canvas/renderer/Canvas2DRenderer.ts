@@ -2,6 +2,7 @@ import type {
   IRenderer,
   Point,
   Rect,
+  RemoteCursor,
   ResizeHandle,
   TransformHitResult,
 } from "./IRenderer";
@@ -49,6 +50,7 @@ export class Canvas2DRenderer implements IRenderer {
   private selectedIds: Set<string> = new Set();
   private hoveredId: string | null = null;
   private dragPreview: Rect | null = null;
+  private remoteCursors: Record<string, RemoteCursor> = {};
 
   mount(canvas: HTMLCanvasElement): void {
     this.canvas = canvas;
@@ -76,12 +78,16 @@ export class Canvas2DRenderer implements IRenderer {
     doc: CanvasDocument,
     selectedIds: Set<string>,
     hoveredId?: string | null,
-    dragPreview?: Rect | null
+    dragPreview?: Rect | null,
+    remoteCursors?: Record<string, RemoteCursor>
   ): void {
     this.currentDoc = doc;
     this.selectedIds = selectedIds;
     this.hoveredId = hoveredId ?? null;
     this.dragPreview = dragPreview ?? null;
+    if (remoteCursors) {
+      this.remoteCursors = remoteCursors;
+    }
     this.isDirty = true;
   }
 
@@ -229,6 +235,64 @@ export class Canvas2DRenderer implements IRenderer {
       ctx.restore();
     }
 
+    // 4. Draw remote collaborator cursors
+    if (Object.keys(this.remoteCursors).length > 0) {
+      this.drawRemoteCursors(ctx, doc.camera.zoom);
+    }
+
+    ctx.restore();
+  }
+
+  private drawRemoteCursors(ctx: CanvasRenderingContext2D, zoom: number): void {
+    const invZ = 1 / zoom;
+
+    ctx.save();
+    for (const cursor of Object.values(this.remoteCursors)) {
+      const { x, y, name, color } = cursor;
+
+      ctx.save();
+      ctx.translate(x, y);
+
+      // Figma-style cursor arrow
+      ctx.beginPath();
+      ctx.moveTo(0, 0);
+      ctx.lineTo(0, 15 * invZ);
+      ctx.lineTo(4 * invZ, 11.5 * invZ);
+      ctx.lineTo(7 * invZ, 17 * invZ);
+      ctx.lineTo(9.5 * invZ, 15.8 * invZ);
+      ctx.lineTo(6.5 * invZ, 10.5 * invZ);
+      ctx.lineTo(12 * invZ, 10.5 * invZ);
+      ctx.closePath();
+
+      ctx.fillStyle = color || "#2E5CFF";
+      ctx.fill();
+      ctx.strokeStyle = "#000000";
+      ctx.lineWidth = 1 * invZ;
+      ctx.stroke();
+
+      // Collaborator name badge underneath
+      if (name) {
+        ctx.font = `600 ${Math.max(9, 11 * invZ)}px Inter, sans-serif`;
+        const textMetrics = ctx.measureText(name);
+        const padX = 6 * invZ;
+        const badgeW = textMetrics.width + padX * 2;
+        const badgeH = 18 * invZ;
+        const badgeX = 8 * invZ;
+        const badgeY = 16 * invZ;
+
+        ctx.fillStyle = color || "#2E5CFF";
+        ctx.beginPath();
+        ctx.roundRect(badgeX, badgeY, badgeW, badgeH, 4 * invZ);
+        ctx.fill();
+
+        ctx.fillStyle = "#FFFFFF";
+        ctx.textAlign = "left";
+        ctx.textBaseline = "middle";
+        ctx.fillText(name, badgeX + padX, badgeY + badgeH / 2);
+      }
+
+      ctx.restore();
+    }
     ctx.restore();
   }
 

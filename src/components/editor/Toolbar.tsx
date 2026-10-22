@@ -4,6 +4,7 @@ import React, { useRef, useState, useEffect } from "react";
 import { useEditorStore } from "@/lib/canvas/store/editorStore";
 import { makeImage } from "@/lib/canvas/document/defaults";
 import { AddNode } from "@/lib/canvas/commands";
+import { uploadProjectAsset } from "@/lib/supabase/storage";
 
 export function Toolbar() {
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -41,13 +42,14 @@ export function Toolbar() {
     }
   };
 
-  const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (!file) return;
 
-    const reader = new FileReader();
-    reader.onload = () => {
-      const dataUrl = reader.result as string;
+    try {
+      const currentProjectId = useEditorStore.getState().projectId || "demo-project";
+      const { storagePath, signedUrl } = await uploadProjectAsset(file, currentProjectId, file.name);
+
       const img = new window.Image();
       img.onload = () => {
         const naturalWidth = img.naturalWidth || 300;
@@ -67,8 +69,8 @@ export function Toolbar() {
           height,
           naturalWidth,
           naturalHeight,
-          storagePath: dataUrl,
-          signedUrl: dataUrl,
+          storagePath,
+          signedUrl,
           name: file.name.slice(0, 30),
         });
 
@@ -77,10 +79,13 @@ export function Toolbar() {
         useEditorStore.getState().setActiveTool("select");
         showToast(`Imported ${file.name}`);
       };
-      img.src = dataUrl;
-    };
-    reader.readAsDataURL(file);
-    e.target.value = "";
+      img.src = signedUrl;
+    } catch (err) {
+      console.error("Failed to upload image:", err);
+      showToast("Failed to import image");
+    } finally {
+      e.target.value = "";
+    }
   };
 
   const isShapeActive =

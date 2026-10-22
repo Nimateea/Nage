@@ -59,11 +59,25 @@ describe("CanvasDocument defaults", () => {
   });
 
   it("creates a text node with typography defaults", () => {
-    const text = makeText({ content: "Design System", fontSize: 24, fontWeight: 600 });
+    const text = makeText({
+      content: "Design System",
+      fontSize: 24,
+      fontFamily: "Space Grotesk, sans-serif",
+      fontWeight: 600,
+      letterSpacing: 1.5,
+      lineHeight: 32,
+      textDecoration: "underline",
+      textCase: "uppercase",
+    });
     expect(text.type).toBe("text");
     expect(text.content).toBe("Design System");
     expect(text.fontSize).toBe(24);
+    expect(text.fontFamily).toBe("Space Grotesk, sans-serif");
     expect(text.fontWeight).toBe(600);
+    expect(text.letterSpacing).toBe(1.5);
+    expect(text.lineHeight).toBe(32);
+    expect(text.textDecoration).toBe("underline");
+    expect(text.textCase).toBe("uppercase");
   });
 
   it("creates an image node with dimensions and URLs", () => {

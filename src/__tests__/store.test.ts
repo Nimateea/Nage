@@ -77,4 +77,64 @@ describe("useEditorStore", () => {
     useEditorStore.getState().setLayersPanelOpen(true);
     expect(useEditorStore.getState().layersPanelOpen).toBe(true);
   });
+
+  it("tracks auto-save status and lastSavedAt", () => {
+    expect(useEditorStore.getState().saveStatus).toBe("saved");
+
+    const rect = makeRectangle({ id: "rect-save-test" });
+    useEditorStore.getState().executeCommand(new AddNode(rect));
+    expect(useEditorStore.getState().saveStatus).toBe("unsaved");
+
+    useEditorStore.getState().setSaveStatus("saving");
+    expect(useEditorStore.getState().saveStatus).toBe("saving");
+
+    useEditorStore.getState().setSaveStatus("saved");
+    expect(useEditorStore.getState().saveStatus).toBe("saved");
+    expect(useEditorStore.getState().lastSavedAt).toBeGreaterThan(0);
+  });
+
+  it("stores and manages multiplayer remote cursors", () => {
+    const cursor = {
+      id: "user-alpha",
+      name: "Alice",
+      x: 120,
+      y: 240,
+      color: "#2E5CFF",
+      lastSeen: Date.now(),
+    };
+
+    useEditorStore.getState().setRemoteCursor("user-alpha", cursor);
+    expect(useEditorStore.getState().remoteCursors["user-alpha"]).toEqual(cursor);
+
+    useEditorStore.getState().removeRemoteCursor("user-alpha");
+    expect(useEditorStore.getState().remoteCursors["user-alpha"]).toBeUndefined();
+  });
+
+  it("manages pages and sidebar tabs", () => {
+    expect(useEditorStore.getState().layersPanelTab).toBe("layers");
+    useEditorStore.getState().setLayersPanelTab("ai");
+    expect(useEditorStore.getState().layersPanelTab).toBe("ai");
+    expect(useEditorStore.getState().layersPanelOpen).toBe(true);
+
+    useEditorStore.getState().setLayersPanelTab("pages");
+    expect(useEditorStore.getState().layersPanelTab).toBe("pages");
+
+    // Add page
+    useEditorStore.getState().addPage("Moodboard Exploration");
+    expect(useEditorStore.getState().pages).toHaveLength(2);
+    expect(useEditorStore.getState().pages[1].name).toBe("Moodboard Exploration");
+
+    // Rename page
+    const newPageId = useEditorStore.getState().pages[1].id;
+    useEditorStore.getState().renamePage(newPageId, "Final Deliverable");
+    expect(useEditorStore.getState().pages[1].name).toBe("Final Deliverable");
+
+    // Switch page
+    useEditorStore.getState().setCurrentPageId(newPageId);
+    expect(useEditorStore.getState().currentPageId).toBe(newPageId);
+
+    // Delete page
+    useEditorStore.getState().deletePage(newPageId);
+    expect(useEditorStore.getState().pages).toHaveLength(1);
+  });
 });

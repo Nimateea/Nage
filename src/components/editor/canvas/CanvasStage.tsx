@@ -24,7 +24,11 @@ import {
 } from "@/lib/canvas/document/defaults";
 import type { CanvasNode, TextNode } from "@/lib/canvas/document/types";
 
-export function CanvasStage() {
+interface CanvasStageProps {
+  onPointerMoveWorld?: (x: number, y: number) => void;
+}
+
+export function CanvasStage({ onPointerMoveWorld }: CanvasStageProps = {}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const rendererRef = useRef<Canvas2DRenderer | null>(null);
@@ -129,6 +133,7 @@ export function CanvasStage() {
   }, []);
 
   // 2. Sync State with Renderer
+  const remoteCursors = useEditorStore((state) => state.remoteCursors);
   useEffect(() => {
     const renderer = rendererRef.current;
     if (!renderer) return;
@@ -137,9 +142,10 @@ export function CanvasStage() {
       document,
       new Set(selectedIds),
       useEditorStore.getState().hoveredId,
-      dragPreview
+      dragPreview,
+      remoteCursors
     );
-  }, [document, selectedIds, dragPreview]);
+  }, [document, selectedIds, dragPreview, remoteCursors]);
 
   // 3. Wheel event for trackpad pan & zoom (with passive: false)
   useEffect(() => {
@@ -443,8 +449,31 @@ export function CanvasStage() {
             }
           }
 
-          // Start dragging nodes
-          const nodesToDrag = document.nodes.filter((n) => nextSelected.has(n.id));
+          // Start dragging nodes (including all contained children of any dragged frame)
+          const directNodesToDrag = document.nodes.filter((n) => nextSelected.has(n.id));
+          const allDragIds = new Set<string>(directNodesToDrag.map((n) => n.id));
+          const draggedFrames = directNodesToDrag.filter((n) => n.type === "frame");
+
+          if (draggedFrames.length > 0) {
+            draggedFrames.forEach((frame) => {
+              document.nodes.forEach((n) => {
+                if (n.id !== frame.id) {
+                  const isChild =
+                    n.parentId === frame.id ||
+                    (!n.parentId &&
+                      n.x >= frame.x &&
+                      n.y >= frame.y &&
+                      n.x + n.width <= frame.x + frame.width &&
+                      n.y + n.height <= frame.y + frame.height);
+                  if (isChild) {
+                    allDragIds.add(n.id);
+                  }
+                }
+              });
+            });
+          }
+
+          const nodesToDrag = document.nodes.filter((n) => allDragIds.has(n.id));
           isDraggingNodesRef.current = {
             startWorldPoint: worldPoint,
             initialPositions: nodesToDrag.map((n) => ({
@@ -499,6 +528,9 @@ export function CanvasStage() {
         y: e.clientY - rect.top,
       };
       const worldPoint = renderer.screenToWorld(screenPoint, document.camera);
+
+      // Broadcast cursor position to collaborators
+      onPointerMoveWorld?.(worldPoint.x, worldPoint.y);
 
       // 1. Handle canvas drag-pan
       if (isDraggingCanvasRef.current) {
@@ -715,7 +747,7 @@ export function CanvasStage() {
         }
       }
     },
-    [activeTool, document, selectedIds, panBy, setHoveredId, setDragPreview, setSelectedIds]
+    [activeTool, document, selectedIds, panBy, setHoveredId, setDragPreview, setSelectedIds, onPointerMoveWorld]
   );
 
   const handlePointerUp = useCallback(
@@ -894,6 +926,31 @@ export function CanvasStage() {
           }
           if (movements.length > 0) {
             executeCommand(new MoveNodes(movements));
+
+            // Reparent nodes based on dropped container frame
+            const frames = currentDoc.nodes.filter((n) => n.type === "frame");
+            useEditorStore.setState((s) => ({
+              document: {
+                ...s.document,
+                nodes: s.document.nodes.map((node) => {
+                  if (node.type === "frame") return node;
+                  const wasMoved = movements.some((m) => m.nodeId === node.id);
+                  if (wasMoved) {
+                    const cx = node.x + node.width / 2;
+                    const cy = node.y + node.height / 2;
+                    const containing = frames.find(
+                      (f) =>
+                        cx >= f.x &&
+                        cx <= f.x + f.width &&
+                        cy >= f.y &&
+                        cy <= f.y + f.height
+                    );
+                    return { ...node, parentId: containing ? containing.id : null };
+                  }
+                  return node;
+                }),
+              },
+            }));
           }
         }
         isDraggingNodesRef.current = null;

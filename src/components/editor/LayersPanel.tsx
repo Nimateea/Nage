@@ -49,6 +49,13 @@ export function LayersPanel() {
   const [isAiBusy, setIsAiBusy] = useState(false);
   const [rateLimitRemaining, setRateLimitRemaining] = useState<number>(60);
   const [geminiConnected, setGeminiConnected] = useState<boolean>(true);
+  const [customApiKey, setCustomApiKey] = useState<string>(() => {
+    if (typeof window !== "undefined") {
+      return localStorage.getItem("nage_gemini_api_key") || "";
+    }
+    return "";
+  });
+  const [showKeyInput, setShowKeyInput] = useState<boolean>(false);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const pageInputRef = useRef<HTMLInputElement>(null);
@@ -228,6 +235,7 @@ export function LayersPanel() {
           projectId: useEditorStore.getState().projectId || undefined,
           selectedNodes: selectedNodes.length > 0 ? selectedNodes : undefined,
           camera: useEditorStore.getState().document.camera,
+          apiKey: customApiKey.trim() || undefined,
         }),
       });
 
@@ -298,10 +306,15 @@ export function LayersPanel() {
     }
   };
 
-  const handleCheckGeminiStatus = async () => {
+  const handleCheckGeminiStatus = async (keyCandidate?: string) => {
+    const key = keyCandidate !== undefined ? keyCandidate : customApiKey;
     try {
       showToast("Testing Gemini 3.8 Flash connection…");
-      const res = await fetch("/api/ai/test");
+      const res = await fetch("/api/ai/test", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ apiKey: key.trim() || undefined }),
+      });
       const data = await res.json();
       if (data.success) {
         setGeminiConnected(true);
@@ -899,17 +912,71 @@ export function LayersPanel() {
 
           {/* Rate Limit Quota & Model Status Indicator */}
           <div className="flex items-center justify-between px-1 pt-1.5 text-[10px] text-[#666666]">
-            <button
-              type="button"
-              onClick={handleCheckGeminiStatus}
-              className="flex items-center gap-1.5 text-[#888888] hover:text-white transition-colors cursor-pointer"
-              title="Click to test Google Gemini 3.8 Flash connection"
-            >
-              <span className={`w-1.5 h-1.5 rounded-full ${geminiConnected ? "bg-[#00E676]" : "bg-[#2E5CFF]"}`} />
-              Gemini 3.8 Flash • Agent
-            </button>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={() => handleCheckGeminiStatus()}
+                className="flex items-center gap-1.5 text-[#888888] hover:text-white transition-colors cursor-pointer"
+                title="Test Google Gemini 3.8 Flash connection"
+              >
+                <span className={`w-1.5 h-1.5 rounded-full ${geminiConnected ? "bg-[#00E676]" : "bg-[#2E5CFF]"}`} />
+                Gemini 3.8 Flash
+              </button>
+              <button
+                type="button"
+                onClick={() => setShowKeyInput((prev) => !prev)}
+                className="text-[#666666] hover:text-[#2E5CFF] transition-colors"
+                title="Configure Gemini API Key"
+              >
+                <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+                  <path d="M21 2l-2 2m-2-2l2 2m-6 6l-6.5 6.5a2.121 2.121 0 0 1-3 0 2.121 2.121 0 0 1 0-3L10 8m2-2l4 4" />
+                </svg>
+              </button>
+            </div>
             <span>Quota: {rateLimitRemaining}/60 hr</span>
           </div>
+
+          {/* Optional Gemini API Key Drawer */}
+          {showKeyInput && (
+            <div className="mt-1.5 p-2 bg-[#141414] rounded-lg border border-[#262626] text-[10px] space-y-1.5">
+              <div className="flex items-center justify-between text-[#A0A0A0]">
+                <span>Gemini API Key</span>
+                <button
+                  type="button"
+                  onClick={() => setShowKeyInput(false)}
+                  className="text-[#666666] hover:text-white"
+                >
+                  ✕
+                </button>
+              </div>
+              <input
+                type="password"
+                value={customApiKey}
+                onChange={(e) => setCustomApiKey(e.target.value)}
+                placeholder="AIzaSy... (optional)"
+                className="w-full bg-[#1A1A1A] text-white px-2 py-1 rounded border border-[#333333] outline-none text-[10px]"
+              />
+              <div className="flex justify-end gap-1.5">
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (typeof window !== "undefined") {
+                      if (customApiKey.trim()) {
+                        localStorage.setItem("nage_gemini_api_key", customApiKey.trim());
+                      } else {
+                        localStorage.removeItem("nage_gemini_api_key");
+                      }
+                    }
+                    handleCheckGeminiStatus(customApiKey.trim());
+                    setShowKeyInput(false);
+                  }}
+                  className="bg-[#2E5CFF] text-white px-2 py-0.5 rounded text-[10px] font-medium hover:bg-[#3E6CFF] transition-colors cursor-pointer"
+                >
+                  Save & Test
+                </button>
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>

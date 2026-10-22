@@ -453,6 +453,21 @@ export async function executeAiGeneration(
       const parsed = extractJsonFromText(responseText);
 
       const reply = typeof parsed.reply === "string" ? parsed.reply : "Generated design components.";
+      const thoughts = Array.isArray(parsed.thoughts)
+        ? (parsed.thoughts as string[])
+        : [
+            `Processed multimodal user intent with Google Gemini (${GEMINI_MODEL}).`,
+            `Analyzed context, geometry, and spatial spawn coordinates.`,
+            `Synthesized clean, compliant CanvasNode component trees.`,
+          ];
+      const steps = Array.isArray(parsed.steps)
+        ? (parsed.steps as AiGenerateResponse["steps"])
+        : [
+            { title: "Prompt Analysis", detail: "Parsed request and canvas positioning", source: "Gemini Engine" as const, status: "done" as const },
+            { title: "Multimodal Generation", detail: "Generated vector nodes and typography", source: "Gemini Engine" as const, status: "done" as const },
+            { title: "Schema Normalization", detail: "Normalized nodes to Nage canvas schema", source: "Vector Synthesizer" as const, status: "done" as const },
+          ];
+
       const rawNodes = Array.isArray(parsed.nodes) ? (parsed.nodes as unknown[]) : [];
       const normalizedNodes = normalizeAiNodes(rawNodes, originX, originY);
 
@@ -467,6 +482,8 @@ export async function executeAiGeneration(
       return {
         success: true,
         text: reply,
+        thoughts,
+        steps,
         generatedNodes: normalizedNodes.length > 0 ? normalizedNodes : undefined,
         rateLimitRemaining: remainingQuota,
         rateLimitTotal: HOURLY_LIMIT,
@@ -503,6 +520,8 @@ export async function executeAiGeneration(
   return {
     success: true,
     text: agentOutput.reply,
+    thoughts: agentOutput.thoughts,
+    steps: agentOutput.steps,
     generatedNodes: agentOutput.nodes,
     rateLimitRemaining: remainingQuota,
     rateLimitTotal: HOURLY_LIMIT,

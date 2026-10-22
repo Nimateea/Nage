@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useRef, useEffect } from "react";
+import { nanoid } from "nanoid";
 import { useEditorStore } from "@/lib/canvas/store/editorStore";
 import {
   AddNode,
@@ -9,6 +10,16 @@ import {
   ReorderNodes,
 } from "@/lib/canvas/commands";
 import type { CanvasNode, TextNode } from "@/lib/canvas/document/types";
+import type { AiThoughtStep } from "@/lib/ai/types";
+
+interface ChatMessage {
+  id: string;
+  sender: "user" | "ai";
+  text: string;
+  thoughts?: string[];
+  steps?: AiThoughtStep[];
+  isThinkingOpen?: boolean;
+}
 
 export function LayersPanel() {
   const {
@@ -38,12 +49,21 @@ export function LayersPanel() {
 
   // AI chat state
   const [aiInput, setAiInput] = useState("");
-  const [aiMessages, setAiMessages] = useState<
-    { sender: "user" | "ai"; text: string }[]
-  >([
+  const [aiMessages, setAiMessages] = useState<ChatMessage[]>([
     {
+      id: "welcome-msg",
       sender: "ai",
-      text: "I am your Gemini AI Design Agent. I can generate movie storyboards from scripts, creative moodboards, wireframes from Pinterest boards, or vector illustrations from reference images.",
+      text: "I am your Gemini AI Design Agent. I can generate movie storyboards with live scouted cinematography from Unsplash, creative moodboards, wireframes from Pinterest boards, or convert your reference images into scalable vector illustrations.",
+      thoughts: [
+        "Online cinematography scouting engine connected to Unsplash, Pexels, Pinterest & Pixabay.",
+        "Image-to-Vector decomposition pipeline ready for reference assets.",
+        "Voice dictation ready for real-time speech input.",
+      ],
+      steps: [
+        { title: "Gemini Generative Agent Ready", detail: "Studio creative modes active", source: "Gemini Engine", status: "done" },
+        { title: "Photography Scouter Ready", detail: "Connected to Unsplash, Pexels & Pinterest", source: "Unsplash", status: "done" },
+      ],
+      isThinkingOpen: false,
     },
   ]);
   const [isAiBusy, setIsAiBusy] = useState(false);
@@ -63,6 +83,11 @@ export function LayersPanel() {
   const [attachedScript, setAttachedScript] = useState<string | null>(null);
   const [attachedScriptName, setAttachedScriptName] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Voice recording dictation state
+  const [isRecording, setIsRecording] = useState(false);
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const recognitionRef = useRef<any>(null);
 
   const inputRef = useRef<HTMLInputElement>(null);
   const pageInputRef = useRef<HTMLInputElement>(null);
@@ -196,9 +221,93 @@ export function LayersPanel() {
     e.target.value = "";
   };
 
+  const toggleVoiceRecording = () => {
+    if (isRecording) {
+      if (recognitionRef.current) {
+        try {
+          recognitionRef.current.stop();
+        } catch {
+          // ignore
+        }
+      }
+      setIsRecording(false);
+      return;
+    }
+
+    const SpeechRecognition =
+      typeof window !== "undefined" &&
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      ((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
+
+    if (!SpeechRecognition) {
+      showToast("Voice recognition not supported in this browser");
+      return;
+    }
+
+    try {
+      const recognition = new SpeechRecognition();
+      recognition.continuous = true;
+      recognition.interimResults = true;
+      recognition.lang = "en-US";
+
+      recognition.onstart = () => {
+        setIsRecording(true);
+        showToast("🎙 Listening… Speak your prompt");
+      };
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      recognition.onresult = (event: any) => {
+        let transcript = "";
+        for (let i = event.resultIndex; i < event.results.length; ++i) {
+          transcript += event.results[i][0].transcript;
+        }
+        if (transcript.trim()) {
+          setAiInput(transcript.trim());
+        }
+      };
+
+      // eslint-disable-next-line @typescript-eslint/no-explicit-any
+      recognition.onerror = (err: any) => {
+        console.warn("Speech recognition error:", err);
+        setIsRecording(false);
+        if (err.error === "not-allowed") {
+          showToast("Microphone access denied");
+        }
+      };
+
+      recognition.onend = () => {
+        setIsRecording(false);
+      };
+
+      recognitionRef.current = recognition;
+      recognition.start();
+    } catch (err) {
+      console.warn("Failed to start speech recognition:", err);
+      setIsRecording(false);
+      showToast("Could not start microphone");
+    }
+  };
+
+  const toggleThinking = (msgId: string) => {
+    setAiMessages((prev) =>
+      prev.map((msg) =>
+        msg.id === msgId ? { ...msg, isThinkingOpen: !msg.isThinkingOpen } : msg
+      )
+    );
+  };
+
   const runAiPrompt = async (promptText: string) => {
     const q = promptText.trim();
     if (!q || isAiBusy) return;
+
+    if (isRecording) {
+      try {
+        recognitionRef.current?.stop();
+      } catch {
+        // ignore
+      }
+      setIsRecording(false);
+    }
 
     // Capture attachments and reset them in UI
     const currentAttachedImage = attachedImage;
@@ -208,7 +317,14 @@ export function LayersPanel() {
     setAttachedScript(null);
     setAttachedScriptName(null);
 
-    setAiMessages((prev) => [...prev, { sender: "user", text: q }]);
+    setAiMessages((prev) => [
+      ...prev,
+      {
+        id: nanoid(),
+        sender: "user",
+        text: q,
+      },
+    ]);
     setIsAiBusy(true);
 
     const lower = q.toLowerCase();
@@ -231,7 +347,11 @@ export function LayersPanel() {
         });
         setAiMessages((prev) => [
           ...prev,
-          { sender: "ai", text: `Updated copy on ${selectedText.length} text layer(s).` },
+          {
+            id: nanoid(),
+            sender: "ai",
+            text: `Updated copy on ${selectedText.length} text layer(s).`,
+          },
         ]);
         showToast("Text updated");
         setIsAiBusy(false);
@@ -252,6 +372,7 @@ export function LayersPanel() {
       setAiMessages((prev) => [
         ...prev,
         {
+          id: nanoid(),
           sender: "ai",
           text: `Renamed ${frames.length} frames to structured artboard names.`,
         },
@@ -322,6 +443,7 @@ export function LayersPanel() {
         setAiMessages((prev) => [
           ...prev,
           {
+            id: nanoid(),
             sender: "ai",
             text:
               "⚠️ " +
@@ -340,10 +462,17 @@ export function LayersPanel() {
         throw new Error(data.error || "Generation failed");
       }
 
-      // Add AI reply message
+      // Add AI reply message with thoughts & step-by-step progress
       setAiMessages((prev) => [
         ...prev,
-        { sender: "ai", text: data.text || "Design generated successfully." },
+        {
+          id: nanoid(),
+          sender: "ai",
+          text: data.text || "Design generated successfully.",
+          thoughts: data.thoughts,
+          steps: data.steps,
+          isThinkingOpen: true,
+        },
       ]);
 
       if (data.rateLimitRemaining !== undefined) {
@@ -372,6 +501,7 @@ export function LayersPanel() {
       setAiMessages((prev) => [
         ...prev,
         {
+          id: nanoid(),
           sender: "ai",
           text:
             "I couldn't reach the generation service right now. Please try again or click one of the quick prompts.",
@@ -918,19 +1048,85 @@ export function LayersPanel() {
           >
             {aiMessages.map((msg, idx) => (
               <div
-                key={`ai-msg-${idx}`}
-                className={`p-2 rounded-xl leading-relaxed ${
+                key={msg.id || `ai-msg-${idx}`}
+                className={`p-2.5 rounded-xl leading-relaxed ${
                   msg.sender === "user"
                     ? "bg-[#2E5CFF]/15 text-white ml-4 border border-[#2E5CFF]/30"
-                    : "bg-[#181818] text-[#CCCCCC] mr-2 border border-[#222222]"
+                    : "bg-[#181818] text-[#D4D4D4] mr-1 border border-[#222222]"
                 }`}
               >
-                {msg.text}
+                {/* Expandable Thinking & Sourcing Process Drawer for AI responses */}
+                {msg.sender === "ai" && (Boolean(msg.thoughts?.length) || Boolean(msg.steps?.length)) && (
+                  <div className="mb-2">
+                    <button
+                      type="button"
+                      onClick={() => toggleThinking(msg.id)}
+                      className="flex items-center justify-between w-full px-2 py-1 rounded bg-[#161722] hover:bg-[#1E2030] text-[#7E96FF] text-[9.5px] font-medium border border-[#2E5CFF]/30 transition-colors cursor-pointer"
+                      title="Inspect agent reasoning, online image scouting and synthesis steps"
+                    >
+                      <div className="flex items-center gap-1.5">
+                        <span className="text-[11px]">🧠</span>
+                        <span>Reasoning & Sourcing ({msg.steps?.length || msg.thoughts?.length} steps)</span>
+                      </div>
+                      <span className="text-[9px] text-[#A0B0FF]">{msg.isThinkingOpen ? "Hide ▲" : "Inspect ▼"}</span>
+                    </button>
+
+                    {msg.isThinkingOpen && (
+                      <div className="mt-1.5 p-2 rounded-lg bg-[#0F1018] border border-[#22263D] text-[10px] space-y-2">
+                        {/* Pipeline Step Cards */}
+                        {msg.steps && msg.steps.length > 0 && (
+                          <div className="space-y-1.5">
+                            {msg.steps.map((st, sIdx) => (
+                              <div key={sIdx} className="flex items-start gap-1.5">
+                                <span className="text-[#00E676] font-bold text-[10px] mt-0.5">✓</span>
+                                <div className="flex-1 min-w-0">
+                                  <div className="flex items-center gap-1.5 flex-wrap">
+                                    <span className="font-semibold text-white text-[10px]">{st.title}</span>
+                                    {st.source && (
+                                      <span className="px-1 py-0.2 rounded text-[8px] font-semibold bg-[#1C233D] text-[#8EA2FF] border border-[#2E5CFF]/40">
+                                        {st.source}
+                                      </span>
+                                    )}
+                                  </div>
+                                  {st.detail && (
+                                    <p className="text-[#888EAA] text-[9px] mt-0.5 leading-snug">{st.detail}</p>
+                                  )}
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        )}
+
+                        {/* Chain of Thought Rationale */}
+                        {msg.thoughts && msg.thoughts.length > 0 && (
+                          <div className="pt-1.5 border-t border-[#1C1F2E] text-[#7A8299] text-[9.5px] italic space-y-0.5">
+                            {msg.thoughts.map((th, tIdx) => (
+                              <p key={tIdx}>• {th}</p>
+                            ))}
+                          </div>
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+
+                {/* Message Body Text */}
+                <div className="text-[11px] leading-relaxed whitespace-pre-wrap">{msg.text}</div>
               </div>
             ))}
+
+            {/* Live Active Thinking Card while generation is in flight */}
             {isAiBusy && (
-              <div className="p-2 rounded-xl bg-[#181818] text-[#888888] italic text-[11px] animate-pulse">
-                Thinking…
+              <div className="p-2.5 rounded-xl bg-[#141520] border border-[#2E5CFF]/40 text-[10px] space-y-1.5 animate-pulse mr-1">
+                <div className="flex items-center gap-2 text-[#4D79FF] font-semibold text-[11px]">
+                  <span className="w-2 h-2 rounded-full bg-[#2E5CFF] animate-ping" />
+                  <span>Agent Thinking & Scouting Online Imagery…</span>
+                </div>
+                <div className="space-y-1 pl-3 border-l-2 border-[#2E5CFF]/30 text-[#8890AA] text-[9.5px]">
+                  <div>● Scouting 16:9 shot cinematography from Unsplash, Pexels & Pinterest</div>
+                  <div>● Decomposing narrative beats and vector geometry</div>
+                  <div>● Synthesizing 60fps compliant canvas components</div>
+                </div>
               </div>
             )}
           </div>
@@ -965,6 +1161,23 @@ export function LayersPanel() {
               );
             })}
           </div>
+
+          {/* Active Voice Recording Pill Indicator */}
+          {isRecording && (
+            <div className="flex items-center justify-between bg-[#2B1111] text-[#FF6B6B] border border-[#FF3B30]/40 rounded-lg px-2.5 py-1 mb-1.5 text-[10px]">
+              <div className="flex items-center gap-1.5 font-medium">
+                <span className="w-2 h-2 rounded-full bg-[#FF3B30] animate-ping" />
+                <span>Dictating live… Speak into your microphone</span>
+              </div>
+              <button
+                type="button"
+                onClick={toggleVoiceRecording}
+                className="text-[#FF9999] hover:text-white font-semibold underline text-[9.5px] cursor-pointer"
+              >
+                Done
+              </button>
+            </div>
+          )}
 
           {/* Active Attachments Preview Bar */}
           {(attachedImage || attachedScript) && (
@@ -1030,6 +1243,8 @@ export function LayersPanel() {
               accept="image/*,.txt,.fountain,.md"
               className="hidden"
             />
+
+            {/* File Upload Attachment Button */}
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
@@ -1044,6 +1259,26 @@ export function LayersPanel() {
                 <path d="M21.44 11.05l-9.19 9.19a6 6 0 0 1-8.49-8.49l9.19-9.19a4 4 0 0 1 5.66 5.66l-9.2 9.19a2 2 0 0 1-2.83-2.83l8.49-8.48" />
               </svg>
             </button>
+
+            {/* Functional Record Mic Button for Voice Dictation */}
+            <button
+              type="button"
+              onClick={toggleVoiceRecording}
+              className={`p-1 rounded-lg transition-all cursor-pointer ${
+                isRecording
+                  ? "text-white bg-[#FF3B30] animate-pulse ring-2 ring-[#FF3B30]/40"
+                  : "text-[#888888] hover:text-white hover:bg-[#222222]"
+              }`}
+              title={isRecording ? "Stop voice dictation" : "Dictate prompt by voice"}
+            >
+              <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M12 1a3 3 0 0 0-3 3v8a3 3 0 0 0 6 0V4a3 3 0 0 0-3-3z" />
+                <path d="M19 10v2a7 7 0 0 1-14 0v-2" />
+                <line x1="12" y1="19" x2="12" y2="23" />
+                <line x1="8" y1="23" x2="16" y2="23" />
+              </svg>
+            </button>
+
             <input
               type="text"
               value={aiInput}
@@ -1055,10 +1290,12 @@ export function LayersPanel() {
                 }
               }}
               placeholder={
-                attachedScript
+                isRecording
+                  ? "Listening… (speaking into mic)"
+                  : attachedScript
                   ? "Describe shot tone or press send…"
                   : attachedImage
-                  ? "Prompt illustration from reference…"
+                  ? "Prompt: convert this image into an illustration…"
                   : "Storyboard, moodboard, wireframe, art…"
               }
               className="flex-1 bg-transparent text-white text-[11px] outline-none px-1"

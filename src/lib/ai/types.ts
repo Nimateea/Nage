@@ -21,9 +21,18 @@ export interface AiGenerateRequest {
   attachedScript?: string; // Script text or screenplay excerpt
 }
 
+export interface AiThoughtStep {
+  title: string;
+  detail?: string;
+  source?: "Unsplash" | "Pexels" | "Pinterest" | "Pixabay" | "Gemini Engine" | "Vector Synthesizer";
+  status: "done" | "in_progress" | "pending";
+}
+
 export interface AiGenerateResponse {
   success: boolean;
   text: string;
+  thoughts?: string[];
+  steps?: AiThoughtStep[];
   generatedNodes?: CanvasNode[];
   rateLimitRemaining?: number;
   rateLimitTotal?: number;

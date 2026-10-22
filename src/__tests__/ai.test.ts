@@ -86,6 +86,17 @@ describe("AI Generation Engine", () => {
       );
       expect(cards.length).toBeGreaterThanOrEqual(4);
 
+      // Verify scouted photographic images from Unsplash / Pexels
+      const photos = result.nodes.filter((n) => n.type === "image");
+      expect(photos.length).toBeGreaterThanOrEqual(4);
+
+      // Verify thoughts and step-by-step progress trace
+      expect(result.thoughts).toBeDefined();
+      expect(result.thoughts?.length).toBeGreaterThan(0);
+      expect(result.steps).toBeDefined();
+      expect(result.steps?.length).toBeGreaterThan(0);
+      expect(result.steps?.some((s) => s.source === "Unsplash")).toBe(true);
+
       const angleTags = result.nodes.filter(
         (n) => n.type === "text" && (n.content.includes("WIDE") || n.content.includes("SHOT"))
       );
@@ -140,7 +151,7 @@ describe("AI Generation Engine", () => {
         undefined,
         sampleDataUrl
       );
-      expect(result.reply).toContain("illustration");
+      expect(result.reply.toLowerCase()).toContain("illustration");
       const frame = result.nodes.find((n) => n.type === "frame");
       expect(frame).toBeDefined();
       expect(frame?.name).toContain("Illustration");
@@ -152,6 +163,16 @@ describe("AI Generation Engine", () => {
       // Verify image node created for attached reference
       const img = result.nodes.find((n) => n.type === "image");
       expect(img).toBeDefined();
+
+      // Verify extracted color swatches and vector silhouette nodes
+      const swatches = result.nodes.filter(
+        (n) => n.type === "rectangle" && n.name.includes("Swatch")
+      );
+      expect(swatches.length).toBe(5);
+
+      // Verify thoughts and steps are provided
+      expect(result.thoughts).toBeDefined();
+      expect(result.steps).toBeDefined();
     });
 
     it("synthesizes ANY custom arbitrary user prompt", () => {

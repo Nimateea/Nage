@@ -1,3 +1,4 @@
+import { NageApp } from "@/components/NageApp";
 import { redirect } from "next/navigation";
 
 export const instant = false;
@@ -17,5 +18,5 @@ export default async function RootPage({ searchParams }: RootPageProps) {
     redirect(`/api/auth/callback?${params.toString()}`);
   }
 
-  redirect("/dashboard");
+  return <NageApp />;
 }

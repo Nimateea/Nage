@@ -12,6 +12,31 @@ const $=id=>document.getElementById(id);
         cc.style.transition='none';
         P.forEach(p=>{if(!p.pages){p.pages=[{id:uid(),name:'Page 1',items:p.items||[],guides:p.guides||[]}];delete p.items;delete p.guides}p.created=p.created||p.updated||Date.now()});
         if(D.acct&&!D.accts){accts=[{id:'u1',...D.acct,dp:D.dp||''}];if(D.sess===true)sess='u1'}
+        if (typeof window !== 'undefined' && window.__nage_initialUser) {
+            const u = window.__nage_initialUser;
+            sess = u.id;
+            lastN = u.name;
+            if (u.dp) dp = u.dp;
+            if (!accts.some(a => a.id === u.id)) {
+                accts.push({ id: u.id, name: u.name, email: u.email || '', dp: u.dp || '' });
+            }
+        }
+        if (typeof window !== 'undefined' && Array.isArray(window.__nage_initialProjects) && window.__nage_initialProjects.length) {
+            window.__nage_initialProjects.forEach(sp => {
+                const existing = P.find(p => p.id === sp.id);
+                if (!existing) {
+                    P.push({
+                        id: sp.id,
+                        title: sp.name || 'Untitled',
+                        created: new Date(sp.created_at).getTime() || Date.now(),
+                        updated: new Date(sp.updated_at).getTime() || Date.now(),
+                        owner: sp.owner_id,
+                        pi: 0,
+                        pages: [{ id: uid(), name: 'Page 1', items: [], guides: [] }]
+                    });
+                }
+            });
+        }
         const me=()=>accts.find(a=>a.id===sess)||null;
         P.forEach(p=>{if(!p.owner)p.owner=accts.length?accts[0].id:'guest'});
         if(me())dp=me().dp||'';
@@ -569,7 +594,7 @@ const $=id=>document.getElementById(id);
 
         const dpIn=h('input');dpIn.type='file';dpIn.accept='image/*';
         function drawDp(){const t=dp?'':(me()?me().name.trim()[0]:'N').toUpperCase();document.querySelectorAll('.dp').forEach(b=>{b.style.backgroundImage=dp?`url(${dp})`:'';b.textContent=t})}
-        const dpMenu=e=>{e.stopPropagation();pop(e.currentTarget,[...(sess?[]:[['Log in',()=>authOpen('login')],['Create account',()=>authOpen('signup')],null]),['Change photo',()=>dpIn.click()],...(dp?[['Remove photo',()=>{dp='';drawDp();save()}]]:[]),...(sess?[null,['Log out',()=>{save();sess=null;dp=gdp;cur=null;drawDp();navSync();show(ve);toast('Logged out')}]]:[])],'right')};
+        const dpMenu=e=>{e.stopPropagation();pop(e.currentTarget,[...(sess?[]:[['Log in',()=>authOpen('login')],['Create account',()=>authOpen('signup')],null]),['Change photo',()=>dpIn.click()],...(dp?[['Remove photo',()=>{dp='';drawDp();save()}]]:[]),...(sess?[null,['Log out',()=>{if(window.__nage_auth&&window.__nage_auth.signOut){window.__nage_auth.signOut().catch(()=>{})};save();sess=null;dp=gdp;cur=null;drawDp();navSync();show(ve);toast('Logged out')}]]:[])],'right')};
         dpIn.onchange=()=>{
             const f=dpIn.files[0];dpIn.value='';if(!f)return;const r=new FileReader();
             r.onload=()=>{const im=new Image();im.onload=()=>{const m=Math.min(im.width,im.height),k=h('canvas');k.width=k.height=160;k.getContext('2d').drawImage(im,(im.width-m)/2,(im.height-m)/2,m,m,0,0,160,160);dp=k.toDataURL('image/jpeg',.85);drawDp();save()};im.src=r.result};
@@ -633,41 +658,77 @@ const $=id=>document.getElementById(id);
             const f=am.querySelector('.auth-form'),M=amode,L=M==='login',S=M==='signup',R=M==='reset',nm=lastN?lastN.split(/\s+/)[0]:'';
             f.className='auth-form'+(S?' s':'');
             f.innerHTML='<h2></h2>'+(R?'<p class="auth-p">Enter the email you signed up with and choose a new password.</p>'+fld('Email','email','email','email')+fld('New password','password','new-password','pw')
-                :fld('Full name','text','name','name')+(S?fld('Email','email','email','email'):'')+fld('Password','password',L?'current-password':'new-password','pw',L))
+                :(L?fld('Email','email','email','email'):fld('Full name','text','name','name'))+(S?fld('Email','email','email','email'):'')+fld('Password','password',L?'current-password':'new-password','pw',L))
                 +(L?'<div class="auth-fg"><a id="auth-fg">Forgot password?</a></div>':'')
                 +`<button class="auth-btn" id="auth-go">${L?'Log in':S?'Create account':'Reset password'}</button><div class="auth-err" id="auth-err"></div><div class="auth-sw">${L?'Don\'t have an account? <a id="auth-sw">Create account</a>':S?'Already have an account? <a id="auth-sw">Log in</a>':'<a id="auth-sw">Back to log in</a>'}</div>`
                 +(R?'':`<div class="auth-or">Or</div><button class="auth-g" id="auth-g">${GG}${L?'Log in with Google':'Sign up with Google'}</button>`);
             f.querySelector('h2').textContent=L?'Welcome Back'+(nm?', '+nm:'')+'!':S?'Create your account':'Reset your password';
             $('auth-sw').onclick=()=>{amode=L?'signup':'login';renderAuth();am.querySelector('input').focus()};
             if(L)$('auth-fg').onclick=()=>{amode='reset';renderAuth();am.querySelector('input').focus()};
-            if(!R)$('auth-g').onclick=()=>toast('Google sign-in is not available in this preview');
+            if(!R)$('auth-g').onclick=()=>{
+                if(window.__nage_auth&&window.__nage_auth.signInWithGoogle){
+                    window.__nage_auth.signInWithGoogle();
+                }else{
+                    toast('Google sign-in is not available in this preview');
+                }
+            };
             $('auth-go').onclick=submit;
             f.querySelectorAll('input').forEach(i=>i.onkeydown=e=>{if(e.key==='Enter')submit()});
         }
         function authOpen(m){amode=m;renderAuth();openM('modal-auth');setTimeout(()=>am.querySelector('input').focus(),150)}
         async function submit(){
-            const M=amode,L=M==='login',err=m=>{$('auth-err').textContent=m},pw=$('a-pw').value,nm=M==='reset'?'':$('a-name').value.trim(),
+            const M=amode,L=M==='login',err=m=>{$('auth-err').textContent=m},pw=$('a-pw').value,
+                  nm=M==='reset'?'':(L?'':$('a-name').value.trim()),
+                  em=$('a-email')?$('a-email').value.trim():'',
                   done=(u,msg)=>{save();sess=u.id;lastN=u.name;dp=u.dp||'';cur=null;save();closeModals();drawDp();navSync();show(ve);toast(msg)};
             try{
+                if(window.__nage_auth){
+                    if(M==='reset'){
+                        if(!em)return err('Enter your email address.');
+                        $('auth-go').textContent='Sending link…';
+                        const res=await window.__nage_auth.resetPassword(em);
+                        $('auth-go').textContent='Reset password';
+                        if(res.error)return err(res.error);
+                        closeModals();toast('Check your email for password reset instructions.');return;
+                    }
+                    if(L){
+                        if(!em||!pw)return err('Enter your email and password.');
+                        $('auth-go').textContent='Logging in…';
+                        const res=await window.__nage_auth.signIn(em,pw);
+                        $('auth-go').textContent='Log in';
+                        if(res.error)return err(res.error);
+                        return done(res.user,'Welcome back, '+(res.user.name||'there').split(/\s+/)[0]);
+                    }
+                    if(!nm||!em||!pw)return err('Fill in all fields.');
+                    if(pw.length<8)return err('Use at least 8 characters for your password.');
+                    $('auth-go').textContent='Creating account…';
+                    const res=await window.__nage_auth.signUp(em,pw,nm);
+                    $('auth-go').textContent='Create account';
+                    if(res.error)return err(res.error);
+                    if(res.needsConfirmation){
+                        closeModals();toast('Check your email to confirm your account!');return;
+                    }
+                    return done(res.user,'Account created. Welcome to Nage!');
+                }
+                // Local fallback
                 if(M==='reset'){
-                    const em=$('a-email').value.trim().toLowerCase(),u=accts.find(a=>a.email.toLowerCase()===em);
+                    const u=accts.find(a=>a.email.toLowerCase()===em.toLowerCase());
                     if(!u)return err('No account found with that email.');
                     if(pw.length<8)return err('Use at least 8 characters for your new password.');
                     const salt=uid()+uid(),hash=await hs(pw,salt);u.salt=salt;u.hash=hash;save();amode='login';renderAuth();toast('Password updated. Log in with your new password.');return;
                 }
-                if(!nm||!pw)return err('Enter your full name and password.');
+                if(!pw)return err('Enter your password.');
                 if(L){
-                    const u=accts.find(a=>a.name.toLowerCase()===nm.toLowerCase());
-                    if(!u)return err('No account found for that name. Create one first.');
-                    if(await hs(pw,u.salt)!==u.hash)return err('Name or password is incorrect.');
+                    const u=accts.find(a=>a.email.toLowerCase()===em.toLowerCase()||a.name.toLowerCase()===em.toLowerCase());
+                    if(!u)return err('No account found. Create one first.');
+                    if(await hs(pw,u.salt)!==u.hash)return err('Password is incorrect.');
                     return done(u,'Welcome back, '+u.name.split(/\s+/)[0]);
                 }
-                const em=$('a-email').value.trim();
-                if(!/^\S+@\S+\.\S+$/.test(em))return err('Enter a valid email address.');
+                if(!nm||!em)return err('Enter your name and email.');
                 if(pw.length<8)return err('Use at least 8 characters for your password.');
-                if(accts.some(a=>a.email.toLowerCase()===em.toLowerCase()||a.name.toLowerCase()===nm.toLowerCase()))return err('An account with this name or email already exists. Log in instead.');
+                if(accts.some(a=>a.email.toLowerCase()===em.toLowerCase()||a.name.toLowerCase()===nm.toLowerCase()))return err('An account with this email already exists.');
                 const salt=uid()+uid(),u={id:uid(),name:nm,email:em,salt,hash:await hs(pw,salt),dp:''};accts.push(u);done(u,'Account created. Welcome to Nage!');
-            }catch(e){err('Secure sign-in is not available in this browser.')}
+            }catch(e){err('Authentication error: '+(e&&e.message||'Please try again.'))}
         }
         function navSync(){vp.querySelectorAll('a.nav-link').forEach(a=>a.style.display=sess?'none':'');$('btn-dp2').classList.toggle('hide',!sess)}
         navSync();
@@ -1330,3 +1391,19 @@ const $=id=>document.getElementById(id);
         }
 
         show(ve);
+        if (typeof window !== 'undefined' && window.__nage_auth) {
+            window.__nage_auth.getSession().then(u => {
+                if (u) {
+                    sess = u.id;
+                    lastN = u.name;
+                    if (u.dp) dp = u.dp;
+                    if (!accts.some(a => a.id === u.id)) {
+                        accts.push({ id: u.id, name: u.name, email: u.email || '', dp: u.dp || '' });
+                    }
+                    drawDp();
+                    navSync();
+                    renderDash();
+                }
+            }).catch(() => {});
+        }
+

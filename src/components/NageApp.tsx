@@ -1,12 +1,143 @@
 "use client";
 
 import React, { useEffect, useRef } from "react";
+import { getSupabaseBrowserClient } from "@/lib/supabase/client";
 
-export function NageApp() {
+export interface NageUser {
+  id: string;
+  email?: string;
+  name: string;
+  dp?: string;
+}
+
+interface NageAppProps {
+  initialUser?: NageUser | null;
+  initialProjects?: unknown[];
+}
+
+export function NageApp({ initialUser, initialProjects }: NageAppProps) {
   const containerRef = useRef<HTMLDivElement>(null);
   const initializedRef = useRef(false);
 
   useEffect(() => {
+    // Provide Supabase Auth bridge to window.__nage_auth
+    const supabase = getSupabaseBrowserClient();
+
+    (window as unknown as { __nage_initialUser?: NageUser | null }).__nage_initialUser = initialUser;
+    (window as unknown as { __nage_initialProjects?: unknown[] }).__nage_initialProjects = initialProjects;
+
+    (window as unknown as { __nage_auth?: Record<string, unknown> }).__nage_auth = {
+      async getSession() {
+        try {
+          const { data: { user } } = await supabase.auth.getUser();
+          if (!user) return null;
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("display_name, avatar_url")
+            .eq("id", user.id)
+            .single();
+          return {
+            id: user.id,
+            email: user.email,
+            name:
+              profile?.display_name ||
+              (user.user_metadata?.full_name as string) ||
+              user.email?.split("@")[0] ||
+              "User",
+            dp: profile?.avatar_url || "",
+          };
+        } catch {
+          return null;
+        }
+      },
+      async signIn(email: string, password: string) {
+        try {
+          const { data, error } = await supabase.auth.signInWithPassword({
+            email: email.trim(),
+            password,
+          });
+          if (error) return { error: error.message };
+          const user = data.user;
+          const { data: profile } = await supabase
+            .from("profiles")
+            .select("display_name, avatar_url")
+            .eq("id", user.id)
+            .single();
+          return {
+            user: {
+              id: user.id,
+              email: user.email,
+              name:
+                profile?.display_name ||
+                (user.user_metadata?.full_name as string) ||
+                user.email?.split("@")[0] ||
+                "User",
+              dp: profile?.avatar_url || "",
+            },
+          };
+        } catch (e: unknown) {
+          return { error: (e as Error)?.message || "Failed to sign in" };
+        }
+      },
+      async signUp(email: string, password: string, name: string) {
+        try {
+          const { data, error } = await supabase.auth.signUp({
+            email: email.trim(),
+            password,
+            options: {
+              data: { full_name: name },
+              emailRedirectTo: `${window.location.origin}/api/auth/callback`,
+            },
+          });
+          if (error) return { error: error.message };
+          const user = data.user;
+          return {
+            user: user
+              ? {
+                  id: user.id,
+                  email: user.email,
+                  name: name || user.email?.split("@")[0] || "User",
+                  dp: "",
+                }
+              : null,
+            needsConfirmation: !data.session,
+          };
+        } catch (e: unknown) {
+          return { error: (e as Error)?.message || "Failed to sign up" };
+        }
+      },
+      async signInWithGoogle() {
+        try {
+          await supabase.auth.signInWithOAuth({
+            provider: "google",
+            options: {
+              redirectTo: `${window.location.origin}/api/auth/callback?next=${encodeURIComponent(window.location.pathname)}`,
+            },
+          });
+        } catch (e: unknown) {
+          console.error("Google OAuth error:", e);
+        }
+      },
+      async resetPassword(email: string) {
+        try {
+          const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), {
+            redirectTo: `${window.location.origin}/api/auth/callback?type=recovery`,
+          });
+          if (error) return { error: error.message };
+          return { success: true };
+        } catch (e: unknown) {
+          return { error: (e as Error)?.message || "Failed to send reset email" };
+        }
+      },
+      async signOut() {
+        try {
+          await supabase.auth.signOut();
+        } catch (e: unknown) {
+          console.error("Sign out error:", e);
+        }
+      },
+    };
+
     if (initializedRef.current || !containerRef.current) return;
     initializedRef.current = true;
 
@@ -21,19 +152,14 @@ export function NageApp() {
     const script = document.createElement("script");
     script.id = "nage-core-engine";
     script.type = "text/javascript";
-
-    // Load the runtime engine from public or inline execution
-    // Since the prototype's engine script interacts with standard DOM elements,
-    // we inject the self-contained prototype script
-    const scriptUrl = "/nage-engine.js";
-    script.src = scriptUrl;
+    script.src = "/nage-engine.js";
     document.body.appendChild(script);
 
     return () => {
       const sc = document.getElementById("nage-core-engine");
       if (sc) sc.remove();
     };
-  }, []);
+  }, [initialUser, initialProjects]);
 
   return (
     <div ref={containerRef} className="w-full h-full relative select-none bg-black text-white overflow-hidden">

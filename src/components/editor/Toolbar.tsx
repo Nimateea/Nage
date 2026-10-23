@@ -16,7 +16,6 @@ export function Toolbar() {
     setActiveTool,
     centerView,
     openShortcutsModal,
-    openIllustrationModal,
     showToast,
   } = useEditorStore();
 
@@ -342,44 +341,6 @@ export function Toolbar() {
           </svg>
         </button>
 
-        {/* Illustration Nodes */}
-        <button
-          id="tool-illustration"
-          type="button"
-          onClick={openIllustrationModal}
-          className="icon-btn hover:opacity-80 transition-opacity"
-          title="Illustration Nodes"
-        >
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            width="20"
-            height="20"
-            viewBox="0 0 20 20"
-            fill="none"
-          >
-            <path
-              d="M1.66666 3.33317C1.66666 2.89114 1.84225 2.46722 2.15481 2.15466C2.46737 1.8421 2.8913 1.6665 3.33332 1.6665H6.66666C7.10868 1.6665 7.53261 1.8421 7.84517 2.15466C8.15773 2.46722 8.33332 2.89114 8.33332 3.33317V6.6665C8.33332 7.10853 8.15773 7.53245 7.84517 7.84501C7.53261 8.15758 7.10868 8.33317 6.66666 8.33317H3.33332C2.8913 8.33317 2.46737 8.15758 2.15481 7.84501C1.84225 7.53245 1.66666 7.10853 1.66666 6.6665V3.33317Z"
-              stroke="white"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            <path
-              d="M5 8.33301V13.333H8.33333"
-              stroke="white"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-            <path
-              d="M10.8333 10.8332C10.8333 10.3911 11.0089 9.96722 11.3215 9.65466C11.634 9.3421 12.058 9.1665 12.5 9.1665H15.8333C16.2753 9.1665 16.6993 9.3421 17.0118 9.65466C17.3244 9.96722 17.5 10.3911 17.5 10.8332V14.1665C17.5 14.6085 17.3244 15.0325 17.0118 15.345C16.6993 15.6576 16.2753 15.8332 15.8333 15.8332H12.5C12.058 15.8332 11.634 15.6576 11.3215 15.345C11.0089 15.0325 10.8333 14.6085 10.8333 14.1665V10.8332Z"
-              stroke="white"
-              strokeWidth="1.5"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-            />
-          </svg>
-        </button>
 
         {/* Shortcuts */}
         <button

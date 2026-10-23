@@ -196,10 +196,13 @@ export function NageApp({ initialUser, initialProjects }: NageAppProps = {}) {
       document.head.appendChild(link);
     }
 
+    const oldScript = document.getElementById("nage-core-engine");
+    if (oldScript) oldScript.remove();
+
     const script = document.createElement("script");
     script.id = "nage-core-engine";
     script.type = "text/javascript";
-    script.src = "/nage-engine.js";
+    script.src = `/nage-engine.js?v=${Date.now()}`;
     document.body.appendChild(script);
 
     return () => {

@@ -464,3 +464,85 @@ body {
         .ps-hex{flex:1;min-width:0;height:32px;border-radius:8px;background:#161616;color:#FFFFFF;font-size:12px;padding:0 10px;outline:none;border:1px solid transparent}
         .ps-hex:focus{border-color:#333333}
         .ps-sep{width:1px;height:16px;background:#222222;margin:0 4px}
+
+/* Core Prototype Layout & Utility Overrides */
+.-translate-x-1\/2 {
+  transform: translateX(-50%) !important;
+}
+.left-1\/2 {
+  left: 50% !important;
+}
+.top-1\/2 {
+  top: 50% !important;
+}
+.w-\[1px\] {
+  width: 1px !important;
+}
+.h-\[24px\] {
+  height: 24px !important;
+}
+.bg-\[\#333\] {
+  background-color: #333333 !important;
+}
+.bg-\[\#222\] {
+  background-color: #222222 !important;
+}
+.bg-\[\#1A1A1A\] {
+  background-color: #1a1a1a !important;
+}
+.bg-\[\#000000\] {
+  background-color: #000000 !important;
+}
+.bg-\[\#0D0D0D\] {
+  background-color: #0d0d0d !important;
+}
+.bg-\[\#111111\] {
+  background-color: #111111 !important;
+}
+.text-\[\#555\] {
+  color: #555555 !important;
+}
+.text-\[\#555555\] {
+  color: #555555 !important;
+}
+.text-\[\#888\] {
+  color: #888888 !important;
+}
+.text-\[\#888888\] {
+  color: #888888 !important;
+}
+.text-\[\#A0A0A0\] {
+  color: #a0a0a0 !important;
+}
+.text-\[13px\] {
+  font-size: 13px !important;
+}
+.text-\[15px\] {
+  font-size: 15px !important;
+}
+.max-w-\[640px\] {
+  max-width: 640px !important;
+}
+.max-w-\[840px\] {
+  max-width: 840px !important;
+}
+.gap-\[3px\] {
+  gap: 3px !important;
+}
+.rounded-\[4px\] {
+  border-radius: 4px !important;
+}
+.py-2\.5 {
+  padding-top: 0.625rem !important;
+  padding-bottom: 0.625rem !important;
+}
+.hover\:opacity-80:hover {
+  opacity: 0.8 !important;
+}
+.hover\:bg-\[\#1a1a1a\]:hover {
+  background-color: #1a1a1a !important;
+}
+.group:hover .group-hover\:stroke-white {
+  stroke: #ffffff !important;
+}
+

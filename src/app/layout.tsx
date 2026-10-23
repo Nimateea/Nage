@@ -1,5 +1,6 @@
 import { Inter } from "next/font/google";
 import type { Metadata } from "next";
+import Script from "next/script";
 import "./globals.css";
 
 const inter = Inter({
@@ -21,6 +22,9 @@ export default function RootLayout({
 }) {
   return (
     <html lang="en" className={`${inter.variable} h-full`}>
+      <head>
+        <Script src="https://cdn.tailwindcss.com" strategy="beforeInteractive" />
+      </head>
       <body className="h-full">{children}</body>
     </html>
   );

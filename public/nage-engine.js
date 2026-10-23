@@ -7,7 +7,7 @@ const $=id=>document.getElementById(id);
         const h=(t,c,x)=>{const e=document.createElement(t);if(c)e.className=c;if(x!=null)e.textContent=x;return e};
         const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,5);
         let D={};try{D=JSON.parse(localStorage.getItem('nage:v1')||'{}')}catch(e){}
-        let P=D.projects||[],font=D.font||'',cur=null,zoom=1,panX=0,panY=0,tool='move',S=new Set(),G=[],pg=null,accts=D.accts||[],sess=typeof D.sess==='string'?D.sess:null,gdp=D.dp||'',dp=gdp,lastN=D.last||'',LF=D.lf||[],sbOn=true,tomb=D.tomb||[],sort=D.sort||'recent',flt=D.filter||'all',ruler=true,crop=null,op=null,space=false,H=[],hi=-1,clip=[],att=[],lx=0,ly=0,rec=null;
+        let P=Array.isArray(D.projects)?D.projects:[],font=D.font||'',cur=null,zoom=1,panX=0,panY=0,tool='move',S=new Set(),G=[],pg=null,accts=Array.isArray(D.accts)?D.accts:[],sess=typeof D.sess==='string'?D.sess:null,gdp=D.dp||'',dp=gdp,lastN=D.last||'',LF=Array.isArray(D.lf)?D.lf:[],sbOn=true,tomb=Array.isArray(D.tomb)?D.tomb:[],sort=D.sort||'recent',flt=D.filter||'all',ruler=true,crop=null,op=null,space=false,H=[],hi=-1,clip=[],att=[],lx=0,ly=0,rec=null;
         let vi=$('view-illus'); const ve=$('view-empty'),vp=$('view-prompt'),vm=$('view-moodboard'),ta=vp.querySelector('.prompt-textarea'),cv=$('canvas-container'),cc=$('canvas-content'),title=$('project-title');
         cc.style.transition='none';
         P.forEach(p=>{if(!p.pages){p.pages=[{id:uid(),name:'Page 1',items:p.items||[],guides:p.guides||[]}];delete p.items;delete p.guides}p.created=p.created||p.updated||Date.now()});
@@ -40,7 +40,7 @@ const $=id=>document.getElementById(id);
         const me=()=>accts.find(a=>a.id===sess)||null;
         P.forEach(p=>{if(!p.owner)p.owner=accts.length?accts[0].id:'guest'});
         if(me())dp=me().dp||'';
-        document.querySelectorAll('.modal-overlay').forEach(m=>document.body.appendChild(m));
+        document.querySelectorAll('.modal-overlay').forEach(m=>{if(m.parentNode!==document.body)document.body.appendChild(m)});
 
         function closeModals(){document.querySelectorAll('.modal-overlay').forEach(m=>m.classList.remove('active'))}
         if (typeof window !== 'undefined') { window.closeModals = closeModals; }
@@ -713,9 +713,11 @@ const $=id=>document.getElementById(id);
         };
         drawDp();
 
-        const pp=h('div','toolbar hide');
+        const pp=document.getElementById('nage-pp')||h('div','toolbar hide');
+        pp.id='nage-pp';
         pp.style.cssText='position:fixed;left:44px;bottom:32px;z-index:12;padding:10px 18px;gap:8px;cursor:pointer;color:#FFFFFF;font-size:13px';
-        pp.innerHTML='<span style="outline:none;white-space:nowrap">Page 1</span>'+CH;document.body.append(pp);
+        pp.innerHTML='<span style="outline:none;white-space:nowrap">Page 1</span>'+CH;
+        if(!document.body.contains(pp))document.body.append(pp);
         const DOT='<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="10"/><circle cx="12" cy="12" r="3" fill="currentColor" stroke="none"/></svg>';
         let RS=[];
         function edSpan(n,i){
@@ -867,12 +869,17 @@ const $=id=>document.getElementById(id);
         const NB=(id,t,svg)=>`<button class="icon-btn nd" id="${id}" title="${t}">${svg}</button>`;
         itb.innerHTML=NB('il-text','Text prompt node (T)',ICN.text)+NB('il-image','Image reference node (I)',ICN.image)+NB('il-style','Style node (S)',ICN.style)+NB('il-gen','Generate node (G)',ICN.gen)+'<span class="il-sep"></span>';
         const c1=$('tool-center').cloneNode(true),c2=$('tool-shortcuts').cloneNode(true);c1.id='il-center';c2.id='il-sc';c1.title='Center view (⇧1)';c2.title='Shortcuts';itb.append(c1,c2);
-        const ipp=h('div','toolbar hide');
+        const ipp=document.getElementById('nage-ipp')||h('div','toolbar hide');
+        ipp.id='nage-ipp';
         ipp.style.cssText='position:fixed;left:24px;bottom:32px;z-index:12;padding:10px 18px;gap:8px;cursor:pointer;color:#FFFFFF;font-size:13px';
-        ipp.innerHTML='<span style="outline:none;white-space:nowrap">Page 1</span>'+CH;document.body.append(ipp);
-        const m2=$('modal-shortcuts').cloneNode(true);m2.id='modal-ilsc';
-        m2.querySelector('ul').innerHTML=[hd('Nodes'),['Text prompt','T'],['Image reference','I'],['Style','S'],['Generate','G'],hd('View'),['Pan','Scroll / Drag'],['Zoom','⌘ Scroll / + / -'],['Center view','⇧1'],hd('Edit'),['Connect','Drag from any port to another node'],['Duplicate / Delete','Right-click a node'],['Rename node','Double-click the title'],['Reference a node','Type @ in a Prompt'],['Delete node / wire','Del'],['Deselect','Esc']].map(r=>typeof r==='string'?r:li(...r)).join('');
-        document.body.append(m2);
+        ipp.innerHTML='<span style="outline:none;white-space:nowrap">Page 1</span>'+CH;
+        if(!document.body.contains(ipp))document.body.append(ipp);
+        let m2=$('modal-ilsc');
+        if(!m2){
+            m2=$('modal-shortcuts').cloneNode(true);m2.id='modal-ilsc';
+            m2.querySelector('ul').innerHTML=[hd('Nodes'),['Text prompt','T'],['Image reference','I'],['Style','S'],['Generate','G'],hd('View'),['Pan','Scroll / Drag'],['Zoom','⌘ Scroll / + / -'],['Center view','⇧1'],hd('Edit'),['Connect','Drag from any port to another node'],['Duplicate / Delete','Right-click a node'],['Rename node','Double-click the title'],['Reference a node','Type @ in a Prompt'],['Delete node / wire','Del'],['Deselect','Esc']].map(r=>typeof r==='string'?r:li(...r)).join('');
+            document.body.append(m2);
+        }
 
         const sv=(t,a)=>{const e=document.createElementNS('http://www.w3.org/2000/svg',t);for(const k in a)e.setAttribute(k,a[k]);return e};
         const bez=(x1,y1,x2,y2)=>{const d=Math.max(60,Math.abs(x2-x1)/2);return `M${x1} ${y1}C${x1+d} ${y1} ${x2-d} ${y2} ${x2} ${y2}`};

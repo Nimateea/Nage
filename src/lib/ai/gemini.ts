@@ -426,7 +426,9 @@ export async function executeAiGeneration(
       req.attachedImage,
       req.attachedScript,
       req.vectorizedImage,
-      req.extractedPalette
+      req.extractedPalette,
+      req.imageWidth,
+      req.imageHeight
     );
 
     await logAiGeneration(
@@ -585,7 +587,9 @@ export async function executeAiGeneration(
     req.attachedImage,
     req.attachedScript,
     req.vectorizedImage,
-    req.extractedPalette
+    req.extractedPalette,
+    req.imageWidth,
+    req.imageHeight
   );
 
   await logAiGeneration(

@@ -136,6 +136,40 @@ describe("Export Engine", () => {
       expect(svg).toContain("Hello &amp; &lt;Nage&gt;!");
       expect(svg).toContain("Artboard &amp; Test");
     });
+
+    it("exports image nodes with proper preserveAspectRatio based on objectFit", () => {
+      const imgContain = {
+        id: "img-1",
+        name: "Contain Image",
+        type: "image" as const,
+        x: 0,
+        y: 0,
+        width: 400,
+        height: 300,
+        naturalWidth: 800,
+        naturalHeight: 600,
+        visible: true,
+        locked: false,
+        opacity: 1,
+        rotation: 0,
+        storagePath: "https://example.com/contain.png",
+        signedUrl: "https://example.com/contain.png",
+        objectFit: "contain" as const,
+        parentId: null,
+      };
+
+      const imgCover = {
+        ...imgContain,
+        id: "img-2",
+        objectFit: "cover" as const,
+      };
+
+      const svgContain = exportToSvg([imgContain], "#000000");
+      expect(svgContain).toContain('preserveAspectRatio="xMidYMid meet"');
+
+      const svgCover = exportToSvg([imgCover], "#000000");
+      expect(svgCover).toContain('preserveAspectRatio="xMidYMid slice"');
+    });
   });
 
   describe("exportToJson", () => {

@@ -302,8 +302,14 @@ export function exportToSvg(
         const imgNode = node as ImageNode;
         const href = imgNode.signedUrl || imgNode.storagePath;
         if (href) {
+          let par = 'preserveAspectRatio="xMidYMid meet"';
+          if (imgNode.objectFit === "cover") {
+            par = 'preserveAspectRatio="xMidYMid slice"';
+          } else if (imgNode.objectFit === "fill") {
+            par = 'preserveAspectRatio="none"';
+          }
           parts.push(
-            `    <image href="${escapeXml(href)}" x="${imgNode.x}" y="${imgNode.y}" width="${imgNode.width}" height="${imgNode.height}" preserveAspectRatio="none"${rot}${opacity} />`
+            `    <image href="${escapeXml(href)}" x="${imgNode.x}" y="${imgNode.y}" width="${imgNode.width}" height="${imgNode.height}" ${par}${rot}${opacity} />`
           );
         }
         break;

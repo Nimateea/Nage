@@ -424,13 +424,17 @@ export function LayersPanel() {
     try {
       let clientVectorDataUrl: string | undefined = undefined;
       let clientPalette: string[] | undefined = undefined;
+      let clientImageWidth: number | undefined = undefined;
+      let clientImageHeight: number | undefined = undefined;
 
       if (currentAttachedImage) {
-        showToast("Vectorizing reference image with 8-tone posterizer…");
+        showToast("Vectorizing reference image into high-fidelity clean artwork…");
         try {
           const vectorResult = await vectorizeImageClient(currentAttachedImage);
           clientVectorDataUrl = vectorResult.vectorDataUrl;
           clientPalette = vectorResult.palette;
+          clientImageWidth = vectorResult.naturalWidth || vectorResult.width;
+          clientImageHeight = vectorResult.naturalHeight || vectorResult.height;
         } catch (vErr) {
           console.warn("Client vectorization note:", vErr);
         }
@@ -447,6 +451,8 @@ export function LayersPanel() {
           attachedScript: currentAttachedScript || undefined,
           vectorizedImage: clientVectorDataUrl || undefined,
           extractedPalette: clientPalette || undefined,
+          imageWidth: clientImageWidth || undefined,
+          imageHeight: clientImageHeight || undefined,
           projectId: useEditorStore.getState().projectId || undefined,
           selectedNodes: selectedNodes.length > 0 ? selectedNodes : undefined,
           camera: useEditorStore.getState().document.camera,

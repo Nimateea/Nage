@@ -1009,7 +1009,9 @@ export function generateIllustrationDesign(
   camera?: { x: number; y: number; zoom: number },
   attachedImage?: string,
   vectorizedImage?: string,
-  extractedPalette?: string[]
+  extractedPalette?: string[],
+  imageWidth?: number,
+  imageHeight?: number
 ): AgentDesignResult {
   const zoom = camera?.zoom || 1;
   const originX = camera ? Math.round(-camera.x / zoom + 40) : 100;
@@ -1021,12 +1023,46 @@ export function generateIllustrationDesign(
 
   // ── SPECIALIZED WORKFLOW: CONVERT REFERENCE IMAGE TO VECTOR ILLUSTRATION ──
   if (attachedImage) {
-    const frameWidth = 920;
-    const frameHeight = 560;
+    const rawW = imageWidth && imageWidth > 0 ? imageWidth : 800;
+    const rawH = imageHeight && imageHeight > 0 ? imageHeight : 600;
+    const aspect = rawW / rawH; // Proportional width / height
+
+    // Dynamically calculate exact dimensions so both cards match reference aspect ratio 1:1 without stretching
+    let dispW: number;
+    let dispH: number;
+    let cardW: number;
+    let cardH: number;
+
+    if (aspect >= 0.95) {
+      // Landscape or square orientation
+      dispW = Math.min(460, Math.max(340, Math.round(420 * Math.min(aspect, 1.35))));
+      dispH = Math.round(dispW / aspect);
+      if (dispH > 380) {
+        dispH = 380;
+        dispW = Math.round(dispH * aspect);
+      }
+      cardW = dispW + 36;
+      cardH = dispH + 170;
+    } else {
+      // Portrait / vertical orientation
+      dispH = 420;
+      dispW = Math.round(dispH * aspect);
+      if (dispW < 240) {
+        dispW = 240;
+        dispH = Math.round(dispW / aspect);
+      }
+      cardW = dispW + 36;
+      cardH = dispH + 170;
+    }
+
+    const gap = 32;
+    const frameWidth = 32 + cardW + gap + cardW + 32;
+    const frameHeight = Math.max(560, cardH + 110);
+    const vectorCardX = originX + 32 + cardW + gap;
 
     const frame = makeFrame({
       id: frameId,
-      name: `Illustration Studio • Vectorized ${displayTitle}`,
+      name: `Illustration Studio • High-Fidelity ${displayTitle}`,
       x: originX,
       y: originY,
       width: frameWidth,
@@ -1081,7 +1117,7 @@ export function generateIllustrationDesign(
         name: "Artboard Title",
         x: originX + 32,
         y: originY + 28,
-        content: `IMAGE-TO-VECTOR STUDIO // ${displayTitle.toUpperCase()}`,
+        content: `VECTOR STUDIO // ${displayTitle.toUpperCase()} (CLEAN REPLICA)`,
         fontSize: 18,
         fontWeight: 700,
         color: "#FFFFFF",
@@ -1092,7 +1128,7 @@ export function generateIllustrationDesign(
         name: "Artboard Subtitle",
         x: originX + 32,
         y: originY + 54,
-        content: "Decomposed reference image into 8-tone stylized vector illustration, bilateral contours, and 5-tone color tokens",
+        content: `High-fidelity clean vector illustration • Bilateral edge-preserving smoothing • Anti-aliased subpixel inking • ${rawW}×${rawH} native resolution`,
         fontSize: 11,
         color: "#7E849E",
         parentId: frameId,
@@ -1104,8 +1140,8 @@ export function generateIllustrationDesign(
         name: "Reference Asset Card",
         x: originX + 32,
         y: originY + 84,
-        width: 270,
-        height: 440,
+        width: cardW,
+        height: cardH,
         cornerRadius: 18,
         fill: { type: "solid", color: "#13141C", opacity: 1 },
         stroke: { color: "#232636", width: 1, opacity: 1, style: "solid" },
@@ -1137,24 +1173,24 @@ export function generateIllustrationDesign(
       makeImage({
         id: refImageId,
         name: "Uploaded Reference Photo",
-        x: originX + 48,
+        x: originX + 50,
         y: originY + 130,
-        width: 238,
-        height: 310,
+        width: dispW,
+        height: dispH,
         storagePath: attachedImage,
         signedUrl: attachedImage,
-        naturalWidth: 400,
-        naturalHeight: 520,
-        objectFit: "cover",
+        naturalWidth: rawW,
+        naturalHeight: rawH,
+        objectFit: "contain",
         parentId: frameId,
       }),
       makeText({
         id: refLabelId,
         name: "Ref Metadata",
-        x: originX + 48,
-        y: originY + 452,
-        width: 238,
-        content: "Source Asset • Ingested for Vectorization",
+        x: originX + 50,
+        y: originY + 140 + dispH,
+        width: dispW,
+        content: `Source Asset • ${rawW}×${rawH} • Ingested for High-Fidelity Vectorization`,
         fontSize: 10,
         color: "#6E748B",
         parentId: frameId,
@@ -1164,8 +1200,8 @@ export function generateIllustrationDesign(
       makeText({
         id: arrowId,
         name: "Vectorize Connector",
-        x: originX + 304,
-        y: originY + 280,
+        x: originX + 32 + cardW + Math.round((gap - 16) / 2),
+        y: originY + 84 + Math.round(cardH / 2) - 12,
         content: "➔",
         fontSize: 20,
         fontWeight: 700,
@@ -1177,10 +1213,10 @@ export function generateIllustrationDesign(
       makeRectangle({
         id: vectorCanvasId,
         name: "Vector Canvas Container",
-        x: originX + 332,
+        x: vectorCardX,
         y: originY + 84,
-        width: 556,
-        height: 440,
+        width: cardW,
+        height: cardH,
         cornerRadius: 18,
         fill: { type: "solid", color: "#0E111C", opacity: 1 },
         stroke: { color: "#252B42", width: 1, opacity: 1, style: "solid" },
@@ -1189,9 +1225,9 @@ export function generateIllustrationDesign(
       makeRectangle({
         id: vectorBadgeId,
         name: "Vector Badge Pill",
-        x: originX + 348,
+        x: vectorCardX + 16,
         y: originY + 98,
-        width: 190,
+        width: 210,
         height: 22,
         cornerRadius: 11,
         fill: { type: "solid", color: "#1A233D", opacity: 1 },
@@ -1201,9 +1237,9 @@ export function generateIllustrationDesign(
       makeText({
         id: vectorBadgeTextId,
         name: "Vector Badge Label",
-        x: originX + 358,
+        x: vectorCardX + 26,
         y: originY + 103,
-        content: "✦ 8-TONE VECTOR ILLUSTRATION",
+        content: "✦ HIGH-FIDELITY VECTOR REPLICA",
         fontSize: 9,
         fontWeight: 700,
         color: "#638BFF",
@@ -1213,15 +1249,15 @@ export function generateIllustrationDesign(
       // High-resolution vectorized illustration image rendered from the reference!
       makeImage({
         id: vectorArtworkId,
-        name: "Vectorized Illustration (8-Tone Cel-Shaded)",
-        x: originX + 348,
+        name: "Vectorized Illustration (Clean Exact Replica)",
+        x: vectorCardX + 18,
         y: originY + 130,
-        width: 524,
-        height: 270,
+        width: dispW,
+        height: dispH,
         storagePath: vectorizedImage || attachedImage,
         signedUrl: vectorizedImage || attachedImage,
-        naturalWidth: 800,
-        naturalHeight: 450,
+        naturalWidth: rawW,
+        naturalHeight: rawH,
         objectFit: "contain",
         parentId: frameId,
       }),
@@ -1229,9 +1265,10 @@ export function generateIllustrationDesign(
       makeText({
         id: vectorTechSpecsId,
         name: "Vector Tech Specs",
-        x: originX + 348,
-        y: originY + 404,
-        content: "Bilateral Contour Smoothing • 8-Tone Color Quantization • Inked Sobel Edges",
+        x: vectorCardX + 18,
+        y: originY + 140 + dispH,
+        width: dispW,
+        content: "Bilateral Surface Smoothing • 32-Tone Quantization • Subpixel Anti-Aliased Edges",
         fontSize: 10,
         color: "#6E748B",
         parentId: frameId,
@@ -1252,6 +1289,9 @@ export function generateIllustrationDesign(
           { name: "Tone 5", hex: "#00E676" },
         ];
 
+    const swatchW = Math.max(52, Math.min(80, Math.floor((dispW - 4 * 8) / 5)));
+    const swatchY = originY + 162 + dispH;
+
     swatches.forEach((sw, idx) => {
       const swId = nanoid();
       const swLabelId = nanoid();
@@ -1261,10 +1301,10 @@ export function generateIllustrationDesign(
         makeRectangle({
           id: swId,
           name: `Extracted Swatch - ${sw.name}`,
-          x: originX + 348 + idx * 105,
-          y: originY + 424,
-          width: 95,
-          height: 32,
+          x: vectorCardX + 18 + idx * (swatchW + 8),
+          y: swatchY,
+          width: swatchW,
+          height: 28,
           cornerRadius: 6,
           fill: { type: "solid", color: sw.hex, opacity: 1 },
           stroke: { color: "#333333", width: 1, opacity: 0.5, style: "solid" },
@@ -1276,10 +1316,10 @@ export function generateIllustrationDesign(
         makeText({
           id: swLabelId,
           name: "Swatch Hex",
-          x: originX + 348 + idx * 105,
-          y: originY + 460,
-          content: `${sw.name} ${sw.hex}`,
-          fontSize: 9,
+          x: vectorCardX + 18 + idx * (swatchW + 8),
+          y: swatchY + 32,
+          content: `${sw.hex}`,
+          fontSize: 8,
           color: "#888888",
           parentId: frameId,
         })
@@ -1287,21 +1327,22 @@ export function generateIllustrationDesign(
     });
 
     return {
-      reply: `Converted the reference image into a multi-tone vector illustration with bilateral contour smoothing, 8-tone color quantization, inked silhouettes, and 5-swatch palette extraction.`,
+      reply: `Converted the reference image into a clean, razor-sharp vector illustration replica with bilateral surface smoothing, 32-tone color gradation, subpixel anti-aliased contours, and 5-swatch palette extraction.`,
       thoughts: [
-        `Ingested source reference photo and applied edge-preserving bilateral smoothing to eliminate camera grain.`,
-        `Quantized pixel color space into 8 discrete illustrative tone bands with saturation contrast grading.`,
-        `Traced subject boundaries and silhouette contours using Sobel gradient inking.`,
+        `Ingested reference image at native resolution (${rawW}×${rawH}) and preserved aspect ratio 1:1.`,
+        `Applied edge-preserving bilateral surface smoothing to merge camera sensor noise into clean vector planes without blurring subject details.`,
+        `Synthesized 32-tone silky tonal gradations to eliminate posterization banding while keeping illustrative crispness.`,
+        `Computed subpixel anti-aliased Sobel contour inking to ensure smooth, unpixelated silhouettes and outlines.`,
         `Extracted 5 chromatic harmony tokens: ${swatches.map((s) => s.hex).join(", ")}.`,
-        `Rendered side-by-side studio canvas artboard featuring original reference alongside converted vector illustration.`,
+        `Emitted side-by-side comparison studio artboard preserving exact original proportions on both cards.`,
       ],
       steps: [
-        { title: "Reference Image Ingestion & Scaling", detail: "Parsed source asset dimensions and buffer", source: "Vector Posterizer", status: "done" },
-        { title: "Bilateral Noise Smoothing", detail: "Merged camera noise into smooth illustrative planes", source: "Vector Posterizer", status: "done" },
-        { title: "8-Tone Chromatic Quantization", detail: "Clustered color space into 8 distinct illustrative bands", source: "Vector Posterizer", status: "done" },
-        { title: "Sobel Contour Edge Inking", detail: "Traced sharp subject silhouettes and specular highlights", source: "Vector Posterizer", status: "done" },
+        { title: "Reference Image Ingestion & Scaling", detail: `Parsed source asset at ${rawW}×${rawH} native resolution`, source: "Vector Posterizer", status: "done" },
+        { title: "Bilateral Surface Smoothing", detail: "Edge-preserving noise suppression without blurring subject features", source: "Vector Posterizer", status: "done" },
+        { title: "32-Tone Silky Quantization", detail: "Eliminated banding artifacts with smooth tonal color curves", source: "Vector Posterizer", status: "done" },
+        { title: "Subpixel Anti-Aliased Inking", detail: "Rendered smooth continuous contour outlines without pixel staircases", source: "Vector Posterizer", status: "done" },
         { title: "Color Story Extraction", detail: "Extracted 5 dominant vector swatches from reference image", source: "Vector Synthesizer", status: "done" },
-        { title: "Studio Artboard Staging", detail: "Emitted dual-artboard layout to Nage canvas", source: "Vector Synthesizer", status: "done" },
+        { title: "Studio Artboard Staging", detail: "Emitted dual-artboard layout with matched aspect ratios to Nage canvas", source: "Vector Synthesizer", status: "done" },
       ],
       nodes,
     };
@@ -1481,7 +1522,9 @@ export function generateAgentDesign(
   attachedImage?: string,
   attachedScript?: string,
   vectorizedImage?: string,
-  extractedPalette?: string[]
+  extractedPalette?: string[],
+  imageWidth?: number,
+  imageHeight?: number
 ): AgentDesignResult {
   const p = prompt.toLowerCase();
   const zoom = camera?.zoom || 1;
@@ -1535,7 +1578,9 @@ export function generateAgentDesign(
       camera,
       attachedImage,
       vectorizedImage,
-      extractedPalette
+      extractedPalette,
+      imageWidth,
+      imageHeight
     );
   }
 

@@ -21,6 +21,8 @@ export interface AiGenerateRequest {
   attachedScript?: string; // Script text or screenplay excerpt
   vectorizedImage?: string; // Client-side vectorized / posterized illustration asset data URL
   extractedPalette?: string[]; // 5 dominant hex tokens extracted from reference
+  imageWidth?: number; // Natural/rendered width of reference image
+  imageHeight?: number; // Natural/rendered height of reference image
 }
 
 export interface AiThoughtStep {

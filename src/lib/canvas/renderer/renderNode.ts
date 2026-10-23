@@ -244,7 +244,37 @@ export function renderImage(
 
   const img = getCachedImage(src, requestRerender);
   if (img) {
-    ctx.drawImage(img, 0, 0, node.width, node.height);
+    ctx.save();
+    ctx.imageSmoothingEnabled = true;
+    ctx.imageSmoothingQuality = "high";
+
+    const fit = node.objectFit || "contain";
+    const naturalW = img.naturalWidth || node.naturalWidth || node.width;
+    const naturalH = img.naturalHeight || node.naturalHeight || node.height;
+
+    if (fit === "fill" || naturalW <= 0 || naturalH <= 0) {
+      ctx.drawImage(img, 0, 0, node.width, node.height);
+    } else if (fit === "contain") {
+      const scale = Math.min(node.width / naturalW, node.height / naturalH);
+      const drawW = naturalW * scale;
+      const drawH = naturalH * scale;
+      const drawX = (node.width - drawW) / 2;
+      const drawY = (node.height - drawH) / 2;
+      ctx.drawImage(img, drawX, drawY, drawW, drawH);
+    } else if (fit === "cover") {
+      const scale = Math.max(node.width / naturalW, node.height / naturalH);
+      const drawW = naturalW * scale;
+      const drawH = naturalH * scale;
+      const drawX = (node.width - drawW) / 2;
+      const drawY = (node.height - drawH) / 2;
+
+      // Clip to node bounds so cover doesn't bleed outside
+      ctx.beginPath();
+      ctx.rect(0, 0, node.width, node.height);
+      ctx.clip();
+      ctx.drawImage(img, drawX, drawY, drawW, drawH);
+    }
+    ctx.restore();
   } else {
     // Loading skeleton placeholder
     ctx.fillStyle = "#0A0A0A";

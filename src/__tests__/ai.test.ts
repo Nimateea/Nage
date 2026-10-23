@@ -171,6 +171,51 @@ describe("AI Generation Engine", () => {
       expect(result.steps).toBeDefined();
     });
 
+    it("dynamically sizes illustration artboard to match image aspect ratio without stretching", () => {
+      const sampleDataUrl = "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+
+      // 1. Landscape 16:9 photo (1920x1080)
+      const landscapeResult = generateAgentDesign(
+        "Convert image to illustration",
+        "illustration",
+        undefined,
+        sampleDataUrl,
+        undefined,
+        sampleDataUrl,
+        ["#000000", "#111111", "#222222", "#333333", "#444444"],
+        1920,
+        1080
+      );
+
+      const landscapeImages = landscapeResult.nodes.filter((n) => n.type === "image");
+      expect(landscapeImages.length).toBe(2);
+      // Both images should share identical width & height matching aspect ratio
+      expect(landscapeImages[0].width).toBe(landscapeImages[1].width);
+      expect(landscapeImages[0].height).toBe(landscapeImages[1].height);
+      // Width should be larger than height for landscape
+      expect(landscapeImages[0].width).toBeGreaterThan(landscapeImages[0].height);
+
+      // 2. Portrait 9:16 photo (1080x1920)
+      const portraitResult = generateAgentDesign(
+        "Convert image to illustration",
+        "illustration",
+        undefined,
+        sampleDataUrl,
+        undefined,
+        sampleDataUrl,
+        undefined,
+        1080,
+        1920
+      );
+
+      const portraitImages = portraitResult.nodes.filter((n) => n.type === "image");
+      expect(portraitImages.length).toBe(2);
+      expect(portraitImages[0].width).toBe(portraitImages[1].width);
+      expect(portraitImages[0].height).toBe(portraitImages[1].height);
+      // Height should be larger than width for portrait
+      expect(portraitImages[0].height).toBeGreaterThan(portraitImages[0].width);
+    });
+
     it("synthesizes ANY custom arbitrary user prompt", () => {
       const result = generateAgentDesign("Crypto wallet portfolio card with send receive buttons");
       expect(result.reply).toContain("Synthesized custom");

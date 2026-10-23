@@ -115,6 +115,12 @@ export function CanvasStage({ onPointerMoveWorld }: CanvasStageProps = {}) {
     const container = containerRef.current;
     if (!container) return;
 
+    const rect = container.getBoundingClientRect();
+    if (rect.width > 0 && rect.height > 0) {
+      renderer.resize(rect.width, rect.height);
+      setViewportSize({ width: rect.width, height: rect.height });
+    }
+
     const ro = new ResizeObserver((entries) => {
       const entry = entries[0];
       if (!entry) return;

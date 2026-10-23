@@ -46,7 +46,7 @@ export function EditorShell({
   });
 
   return (
-    <div className="w-full h-full relative overflow-hidden bg-black select-none text-white font-sans">
+    <div className="fixed inset-0 w-screen h-screen overflow-hidden bg-black select-none text-white font-sans">
       {/* Top Header */}
       <EditorHeader
         initialTitle={project.name}

@@ -289,8 +289,46 @@ const $=id=>document.getElementById(id);
         let creating=false;
         const HEUR=t=>/illustrat|icon set|artwork|\bdraw|mascot|character design|vector art/i.test(t)?'illustration':/\bfonts?\b|typeface|typography|lettering|font pairing/i.test(t)?'font':'moodboard';
         async function plan(t,kind,nimg){
-            const sm=await claude.use('sample');if(!sm)return null;
-            return sm.json(`You are the creative agent for Nage, a design tool that makes moodboards, illustrations and fonts from a prompt.\nDecide what the person needs: "moodboard" (a visual direction: brand, vibe, aesthetic, inspiration, collage, style exploration; also the default when unclear), "illustration" (they want custom illustrations, artwork, icons or characters drawn) or "font" (they want a typeface, font pairing or lettering). ${kind?'The person chose '+kind+' explicitly, so type must be '+kind+'.':''}\nReturn ONLY JSON: {"type":"moodboard|illustration|font","title":"2-4 word project title","say":"one short sentence","actions":[...]}. For illustration or font return an empty actions array.\nFor a moodboard compose a rich board on a canvas (px, origin 0,0 at center, x right, y down, every x,y is the top-left corner) within x -700..700 and y -450..450${nimg?', and keep x>=480 empty because the person attached images there':''}. Suggested grid: hero frame (-700,-430, 760x360) holding a big headline (size 56-72, weight 700, w 680) and a one-line mood statement (size 18, color #A0A0A0); keywords frame (80,-430, 420x360) with 5-6 short mood phrases as separate texts; palette (x -700, y -40) with 5-6 colors invented for this idea; tone-of-voice frame (80,-40, 420x180) with a sample line; typography frame (-700,180, 760x260) with a display sample and a body sample using fonts serif, sans or mono. Put each text after the frame it sits in, inside that frame's bounds. Frame fills #111111 or #1A1A1A; text colors #FFFFFF #E5E5E5 #A0A0A0 or colors from your palette.\nOps: {"op":"text","text":"...","x":0,"y":0,"size":24,"weight":400,"color":"#hex","w":fixed width,"align":"left|center|right","font":"sans|serif|mono"} {"op":"frame","name":"...","x":0,"y":0,"w":400,"h":300,"fill":"#hex"} {"op":"palette","x":0,"y":0,"colors":[{"hex":"#hex","name":"short name"}]}\nRequest: ${JSON.stringify(t)}`,{cache:false});
+            try {
+                const res = await fetch('/api/ai/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt: t,
+                        task: kind || (HEUR(t) === 'illustration' ? 'illustration' : 'moodboard')
+                    })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.success && Array.isArray(data.generatedNodes) && data.generatedNodes.length > 0) {
+                        const actions = data.generatedNodes.map(node => {
+                            if (node.type === 'frame') {
+                                return { op: 'frame', name: node.name || 'Frame', x: node.x, y: node.y, w: node.width, h: node.height, fill: (node.fill && node.fill.color) || '#111111' };
+                            } else if (node.type === 'text') {
+                                return { op: 'text', text: node.content || '', x: node.x, y: node.y, size: node.fontSize || 24, weight: node.fontWeight || 400, color: node.color || '#FFFFFF', w: node.width, align: node.textAlign || 'left' };
+                            } else if (node.type === 'rectangle' || node.type === 'ellipse') {
+                                return { op: 'palette', x: node.x, y: node.y, colors: [{ hex: (node.fill && node.fill.color) || '#2E5CFF', name: node.name || 'Color' }] };
+                            }
+                            return null;
+                        }).filter(Boolean);
+                        if (actions.length > 0) {
+                            return {
+                                type: kind || HEUR(t),
+                                title: t.slice(0, 24),
+                                say: data.text || 'Moodboard generated with Gemini.',
+                                actions
+                            };
+                        }
+                    }
+                }
+            } catch(e) {}
+            if (typeof claude !== 'undefined' && claude.use) {
+                try {
+                    const sm=await claude.use('sample');
+                    if(sm) return sm.json(`You are the creative agent for Nage, a design tool that makes moodboards, illustrations and fonts from a prompt.\nDecide what the person needs: "moodboard" (a visual direction: brand, vibe, aesthetic, inspiration, collage, style exploration; also the default when unclear), "illustration" (they want custom illustrations, artwork, icons or characters drawn) or "font" (they want a typeface, font pairing or lettering). ${kind?'The person chose '+kind+' explicitly, so type must be '+kind+'.':''}\nReturn ONLY JSON: {"type":"moodboard|illustration|font","title":"2-4 word project title","say":"one short sentence","actions":[...]}. For illustration or font return an empty actions array.\nFor a moodboard compose a rich board on a canvas (px, origin 0,0 at center, x right, y down, every x,y is the top-left corner) within x -700..700 and y -450..450${nimg?', and keep x>=480 empty because the person attached images there':''}. Suggested grid: hero frame (-700,-430, 760x360) holding a big headline (size 56-72, weight 700, w 680) and a one-line mood statement (size 18, color #A0A0A0); keywords frame (80,-430, 420x360) with 5-6 short mood phrases as separate texts; palette (x -700, y -40) with 5-6 colors invented for this idea; tone-of-voice frame (80,-40, 420x180) with a sample line; typography frame (-700,180, 760x260) with a display sample and a body sample using fonts serif, sans or mono. Put each text after the frame it sits in, inside that frame's bounds. Frame fills #111111 or #1A1A1A; text colors #FFFFFF #E5E5E5 #A0A0A0 or colors from your palette.\nOps: {"op":"text","text":"...","x":0,"y":0,"size":24,"weight":400,"color":"#hex","w":fixed width,"align":"left|center|right","font":"sans|serif|mono"} {"op":"frame","name":"...","x":0,"y":0,"w":400,"h":300,"fill":"#hex"} {"op":"palette","x":0,"y":0,"colors":[{"hex":"#hex","name":"short name"}]}\nRequest: ${JSON.stringify(t)}`,{cache:false});
+                } catch(e) {}
+            }
+            return null;
         }
         function start(r,f,t){
             const n=Date.now(),ti=String(r.title||t||'Untitled').trim()||'Untitled',act=Array.isArray(r.actions)&&r.actions.length,
@@ -937,13 +975,50 @@ const $=id=>document.getElementById(id);
         const reaches=(a,b,seen=new Set())=>{if(a===b)return true;if(seen.has(a))return false;seen.add(a);return ig.edges.filter(e=>e.from===a).some(e=>reaches(e.to,b,seen))};
         function dupNode(id){const n=ig.nodes.find(x=>x.id===id);if(!n)return;const c={...n,id:(ig.nid=(ig.nid||0)+1),x:n.x+32,y:n.y+32,busy:false,name:uname(n.k)};ig.nodes.push(c);isel={n:c.id};ilRender();ilSave()}
         function rast(src){return new Promise(r=>{const im=new Image();im.onload=()=>{const W=im.width||512,H=im.height||512,s=Math.min(1,448/Math.max(W,H)),k=h('canvas');k.width=Math.max(1,Math.round(W*s));k.height=Math.max(1,Math.round(H*s));const g=k.getContext('2d');g.fillStyle='#FFFFFF';g.fillRect(0,0,k.width,k.height);g.drawImage(im,0,0,k.width,k.height);r(k.toDataURL('image/jpeg',.72).split(',')[1])};im.onerror=()=>r(null);im.src=src})}
-        async function gemReady(){const r=await sbq('select public.nage_gen_ready() as r');return !!(r[0]&&r[0].r)}
+        async function gemReady(){
+            try {
+                const res = await fetch('/api/ai/test');
+                if (res.ok) {
+                    const data = await res.json();
+                    return !!data.success;
+                }
+            } catch(e) {}
+            try {
+                const r=await sbq('select public.nage_gen_ready() as r');
+                return !!(r[0]&&r[0].r);
+            } catch(e) {
+                return false;
+            }
+        }
         async function gemGen(B){
+            const txt=B.text.join(' ')||'Illustration concept';
+            const style=B.style.join(', ')||'flat vector';
+            const attachedImage=B.img.length?B.img[0].s:undefined;
+            try {
+                const res = await fetch('/api/ai/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt: `Illustration: ${txt}. Style: ${style}.`,
+                        task: 'illustration',
+                        attachedImage
+                    })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.success && data.generatedNodes) {
+                        const imgNode = data.generatedNodes.find(n => n.type === 'image');
+                        if (imgNode && (imgNode.signedUrl || imgNode.storagePath)) {
+                            return imgNode.signedUrl || imgNode.storagePath;
+                        }
+                    }
+                }
+            } catch(e) {}
             const imgs=B.img.slice(0,3),b64=[];
             for(const x of imgs){const d=await rast(x.s);if(d)b64.push(d)}
-            const legend=imgs.map((x,i)=>`image ${i+1} is "${x.n}"`).join('; '),style=B.style.length?B.style.join('; '):'';
-            const txt=`Create one polished illustration.\nInstructions (follow every one): ${B.text.map((t,i)=>`(${i+1}) ${t}`).join(' ')||'Use the reference images as the subject and inspiration.'}\n${style?'Style: '+style+'.\n':''}${b64.length?'Reference images are attached ('+legend+'). Use them as visual references for subject, palette and composition, as the instructions describe.\n':''}Square composition. No text, captions or watermarks.`;
-            const body={contents:[{parts:[{text:txt},...b64.map(d=>({inlineData:{mimeType:'image/jpeg',data:d}}))]}],generationConfig:{responseModalities:['TEXT','IMAGE']}};
+            const legend=imgs.map((x,i)=>`image ${i+1} is "${x.n}"`).join('; '),styleStr=B.style.length?B.style.join('; '):'';
+            const promptTxt=`Create one polished illustration.\nInstructions (follow every one): ${B.text.map((t,i)=>`(${i+1}) ${t}`).join(' ')||'Use the reference images as the subject and inspiration.'}\n${styleStr?'Style: '+styleStr+'.\n':''}${b64.length?'Reference images are attached ('+legend+'). Use them as visual references for subject, palette and composition, as the instructions describe.\n':''}Square composition. No text, captions or watermarks.`;
+            const body={contents:[{parts:[{text:promptTxt},...b64.map(d=>({inlineData:{mimeType:'image/jpeg',data:d}}))]}],generationConfig:{responseModalities:['TEXT','IMAGE']}};
             const js=JSON.stringify(body).split('$nage$').join('');
             const st=await sbq(`select public.nage_gen_start($nage$${js}$nage$::jsonb) as id`),rid=st[0]&&st[0].id;
             if(rid==null)throw new Error('Could not start the request');
@@ -1365,13 +1440,64 @@ const $=id=>document.getElementById(id);
         let busy=false;
         async function go(q){
             q=(q||$('ai-in').value).trim();if(!q||busy)return;$('ai-in').value='';bub(q,1);busy=true;const w=bub('Thinking…');
-            try{
-                const sm=await claude.use('sample');if(!sm)throw{code:'na'};
-                const els=[...cc.children],L=els.map((el,i)=>({id:i,type:isF(el)?'frame':isS(el)?'shape':isT(el)?'text':'image',x:Math.round(parseFloat(el.style.left)),y:Math.round(parseFloat(el.style.top)),w:el.offsetWidth,h:el.offsetHeight,...(isT(el)?{text:el.innerText}:{}),...(isF(el)?{name:el.dataset.n}:{}),selected:S.has(el),colors:cols(el)})),fs=[...S].filter(isF),sc=fs.length?[...new Set([...fs,...within(fs)])].map(x=>els.indexOf(x)):[];
-                const r=await sm.json(`You are the design agent inside Nage, a dark moodboard canvas. Units are px; origin (0,0) is the canvas center; x grows right, y grows down. Project title: ${JSON.stringify(cur&&cur.title)}.\nLayers (bottom to top): ${JSON.stringify(L)}\nLayer ids inside the selected frame(s): ${JSON.stringify(sc)}\nReturn ONLY JSON: {"say":"one short sentence","actions":[...]} where each action is one of:\n{"op":"text","text":"...","x":0,"y":0,"size":24,"weight":400,"color":"#hex","w":optional fixed width,"align":"left|center|right"}\n{"op":"frame","name":"...","x":0,"y":0,"w":400,"h":300,"fill":"#hex"}\n{"op":"edit","id":n,"text":"...","size":n,"color":"#hex","fill":"#hex","name":"..."} (include only changed fields; text for text layers, fill and name for frames)\n{"op":"move","id":n,"x":n,"y":n}\n{"op":"delete","id":n}\n{"op":"palette","colors":[{"hex":"#hex","name":"short name"}]} (5-8 colors derived from the observed "colors" of the layers in scope: contents of the selected frame(s), else the selected layers, else all layers; harmonise and drop near-duplicates; the page renders the swatches)\nUse the palette #FFFFFF #E5E5E5 #A0A0A0 #2E5CFF #FF5E2E #111111 #1A1A1A. Put new text after the frames it belongs in. Stay within about 1400x900 around the origin. If no canvas change is needed return an empty actions array and answer in "say".\nRequest: ${q}`,{cache:false});
-                w.textContent=run(r,els);
-            }catch(e){w.textContent=e&&e.code==='not_granted'?'AI access was declined.':e&&e.code==='rate_limited'?'Rate limited, try again shortly.':'AI is not available here.'}
-            busy=false;
+            try {
+                const res = await fetch('/api/ai/generate', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        prompt: q,
+                        task: q.toLowerCase().includes('palette') ? 'palette' : q.toLowerCase().includes('rewrite') ? 'copy' : 'design',
+                        selectedNodes: [...S].map((el, i) => ({
+                            id: String(i),
+                            name: isF(el) ? (el.dataset.n || 'Frame') : isT(el) ? 'Text' : 'Layer',
+                            type: isF(el) ? 'frame' : isT(el) ? 'text' : isI(el) ? 'image' : 'rectangle',
+                            x: parseFloat(el.style.left) || 0,
+                            y: parseFloat(el.style.top) || 0,
+                            width: el.offsetWidth,
+                            height: el.offsetHeight,
+                            content: isT(el) ? el.innerText : undefined
+                        }))
+                    })
+                });
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data && data.success) {
+                        if (Array.isArray(data.generatedNodes) && data.generatedNodes.length > 0) {
+                            const newEls = [];
+                            data.generatedNodes.forEach(node => {
+                                if (node.type === 'frame') {
+                                    newEls.push(mkF(node.x, node.y, node.name, node.width, node.height, (node.fill && node.fill.color) || '#111111'));
+                                } else if (node.type === 'text') {
+                                    const t = ntx(node.x, node.y);
+                                    t.textContent = node.content || '';
+                                    if (node.fontSize) t.style.fontSize = node.fontSize + 'px';
+                                    if (node.color) t.style.color = node.color;
+                                    if (node.width) { t.style.width = node.width + 'px'; t.style.whiteSpace = 'pre-wrap'; }
+                                    newEls.push(t);
+                                }
+                            });
+                            if (newEls.length) { setSel(newEls); commit(); }
+                        }
+                        w.textContent = data.text || 'Generated with Gemini 3.8 Flash.';
+                        busy = false;
+                        return;
+                    }
+                }
+            } catch(e) {}
+            if (typeof claude !== 'undefined' && claude.use) {
+                try {
+                    const sm=await claude.use('sample');
+                    if(sm) {
+                        const els=[...cc.children],L=els.map((el,i)=>({id:i,type:isF(el)?'frame':isS(el)?'shape':isT(el)?'text':'image',x:Math.round(parseFloat(el.style.left)),y:Math.round(parseFloat(el.style.top)),w:el.offsetWidth,h:el.offsetHeight,...(isT(el)?{text:el.innerText}:{}),...(isF(el)?{name:el.dataset.n}:{}),selected:S.has(el),colors:cols(el)})),fs=[...S].filter(isF),sc=fs.length?[...new Set([...fs,...within(fs)])].map(x=>els.indexOf(x)):[];
+                        const r=await sm.json(`You are the design agent inside Nage, a dark moodboard canvas. Units are px; origin (0,0) is the canvas center; x grows right, y grows down. Project title: ${JSON.stringify(cur&&cur.title)}.\nLayers (bottom to top): ${JSON.stringify(L)}\nLayer ids inside the selected frame(s): ${JSON.stringify(sc)}\nReturn ONLY JSON: {"say":"one short sentence","actions":[...]} where each action is one of:\n{"op":"text","text":"...","x":0,"y":0,"size":24,"weight":400,"color":"#hex","w":optional fixed width,"align":"left|center|right"}\n{"op":"frame","name":"...","x":0,"y":0,"w":400,"h":300,"fill":"#hex"}\n{"op":"edit","id":n,"text":"...","size":n,"color":"#hex","fill":"#hex","name":"..."} (include only changed fields; text for text layers, fill and name for frames)\n{"op":"move","id":n,"x":n,"y":n}\n{"op":"delete","id":n}\n{"op":"palette","colors":[{"hex":"#hex","name":"short name"}]} (5-8 colors derived from the observed "colors" of the layers in scope: contents of the selected frame(s), else the selected layers, else all layers; harmonise and drop near-duplicates; the page renders the swatches)\nUse the palette #FFFFFF #E5E5E5 #A0A0A0 #2E5CFF #FF5E2E #111111 #1A1A1A. Put new text after the frames it belongs in. Stay within about 1400x900 around the origin. If no canvas change is needed return an empty actions array and answer in "say".\nRequest: ${q}`,{cache:false});
+                        w.textContent=run(r,els);
+                        busy = false;
+                        return;
+                    }
+                } catch(e) {}
+            }
+            w.textContent = 'AI is not available right now. Please check your Gemini connection.';
+            busy = false;
         }
         function run(r,els){
             const ok=c=>typeof c==='string'&&/^#[0-9a-f]{3,8}$/i.test(c),n=(v,d)=>Number.isFinite(+v)?+v:d,made=[];
@@ -1391,19 +1517,3 @@ const $=id=>document.getElementById(id);
         }
 
         show(ve);
-        if (typeof window !== 'undefined' && window.__nage_auth) {
-            window.__nage_auth.getSession().then(u => {
-                if (u) {
-                    sess = u.id;
-                    lastN = u.name;
-                    if (u.dp) dp = u.dp;
-                    if (!accts.some(a => a.id === u.id)) {
-                        accts.push({ id: u.id, name: u.name, email: u.email || '', dp: u.dp || '' });
-                    }
-                    drawDp();
-                    navSync();
-                    renderDash();
-                }
-            }).catch(() => {});
-        }
-

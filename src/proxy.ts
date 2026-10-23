@@ -34,8 +34,8 @@ export async function proxy(request: NextRequest) {
 
   const { pathname } = request.nextUrl;
 
-  // Protect /dashboard and its sub-routes
-  if (pathname.startsWith("/dashboard") && !user) {
+  // Protect /dashboard/[projectId] sub-routes
+  if (pathname.startsWith("/dashboard/") && !user) {
     const url = request.nextUrl.clone();
     url.pathname = "/login";
     url.searchParams.set("redirectTo", pathname);

@@ -15,7 +15,7 @@ interface NageAppProps {
   initialProjects?: unknown[];
 }
 
-export function NageApp({ initialUser, initialProjects }: NageAppProps) {
+export function NageApp({ initialUser, initialProjects }: NageAppProps = {}) {
   const containerRef = useRef<HTMLDivElement>(null);
   const initializedRef = useRef(false);
 

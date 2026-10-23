@@ -138,6 +138,53 @@ export function NageApp({ initialUser, initialProjects }: NageAppProps = {}) {
       },
     };
 
+    (window as unknown as { __nage_db?: Record<string, unknown> }).__nage_db = {
+      async createProject(title: string, prompt?: string) {
+        try {
+          const { createProjectAction } = await import("@/lib/supabase/projects");
+          const project = await createProjectAction(title, prompt);
+          return project;
+        } catch (e: unknown) {
+          console.warn("createProjectAction error:", e);
+          return null;
+        }
+      },
+      async renameProject(projectId: string, newName: string) {
+        try {
+          const { renameProjectAction } = await import("@/lib/supabase/projects");
+          await renameProjectAction(projectId, newName);
+        } catch (e: unknown) {
+          console.warn("renameProjectAction error:", e);
+        }
+      },
+      async duplicateProject(projectId: string) {
+        try {
+          const { duplicateProjectAction } = await import("@/lib/supabase/projects");
+          const dup = await duplicateProjectAction(projectId);
+          return dup;
+        } catch (e: unknown) {
+          console.warn("duplicateProjectAction error:", e);
+          return null;
+        }
+      },
+      async deleteProject(projectId: string) {
+        try {
+          const { deleteProjectAction } = await import("@/lib/supabase/projects");
+          await deleteProjectAction(projectId);
+        } catch (e: unknown) {
+          console.warn("deleteProjectAction error:", e);
+        }
+      },
+      async saveProject(projectId: string, docData: Record<string, unknown>) {
+        try {
+          const { saveProjectDocumentAction } = await import("@/lib/supabase/projects");
+          await saveProjectDocumentAction(projectId, docData);
+        } catch (e: unknown) {
+          console.warn("saveProjectDocumentAction error:", e);
+        }
+      },
+    };
+
     if (initializedRef.current || !containerRef.current) return;
     initializedRef.current = true;
 

@@ -51,18 +51,36 @@ const $=id=>document.getElementById(id);
         function save(){
             if(cur&&pg){pg.items=[...cc.children].map(ser);pg.guides=G;cur.updated=Date.now()}
             try{localStorage.setItem('nage:v1',(()=>{const u=me();if(u)u.dp=dp;else gdp=dp;const used=new Set(),out=JSON.stringify({projects:P,font,dp:gdp,sort,filter:flt,accts,sess,last:lastN,lf:LF,sb:sbOn,tomb},mkRep(used));prune(used);return out})())}catch(e){toast('Storage is full, changes may not persist')}if(sbOn&&!sbBusy){clearTimeout(sbTm);sbTm=setTimeout(()=>sbSync(false,true),6000)}
+            if(sess&&sess!=='guest'&&cur&&cur.id&&typeof window!=='undefined'&&window.__nage_db&&window.__nage_db.saveProject){
+                window.__nage_db.saveProject(cur.id,cur).catch(()=>{});
+            }
         }
         function show(v){[ve,vp,vm,vi].forEach(x=>x.classList.toggle('hide',x!==v));pp.classList.toggle('hide',v!==vm);ipp.classList.toggle('hide',v!==vi);if(v!==vm){crop=null;S.clear();[tb,ab,ap,sm,ps].forEach(x=>x.classList.add('hide'))}if(v===ve)renderDash();if(v===vp)setTimeout(()=>ta.focus(),100)}
         function ago(t){const m=Math.round((Date.now()-t)/6e4);return m<1?'Just now':m<60?m+'m ago':m<1440?Math.round(m/60)+'h ago':Math.round(m/1440)+'d ago'}
         const DOTS='<svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor"><circle cx="5" cy="12" r="1.8"/><circle cx="12" cy="12" r="1.8"/><circle cx="19" cy="12" r="1.8"/></svg>',CH='<svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><polyline points="6 9 12 15 18 9"/></svg>';
         const SORTS={recent:'Recent activity',az:'Alphabetical',new:'Date created'},FLTS={all:'All projects',multi:'Multiple pages',img:'With images',frm:'With frames'};
         const copyLink=()=>(navigator.clipboard?navigator.clipboard.writeText(location.href):Promise.reject()).then(()=>toast('Link copied'),()=>toast('Copy is not available here'));
-        function dupP(p){const c=JSON.parse(JSON.stringify(p));c.id=uid();c.title+=' copy';c.created=c.updated=Date.now();c.pages.forEach(x=>x.id=uid());P.unshift(c);save();renderDash();toast('Project duplicated')}
-        function delP(p){tomb.push(p.id);P=P.filter(x=>x!==p);save();renderDash();toast('Project deleted')}
+        function dupP(p){
+            const c=JSON.parse(JSON.stringify(p));c.id=uid();c.title+=' copy';c.created=c.updated=Date.now();c.pages.forEach(x=>x.id=uid());P.unshift(c);save();renderDash();toast('Project duplicated');
+            if(sess&&sess!=='guest'&&typeof window!=='undefined'&&window.__nage_db&&window.__nage_db.duplicateProject){
+                window.__nage_db.duplicateProject(p.id).then(sp=>{if(sp&&sp.id){c.id=sp.id;save();}}).catch(()=>{});
+            }
+        }
+        function delP(p){
+            tomb.push(p.id);P=P.filter(x=>x!==p);save();renderDash();toast('Project deleted');
+            if(sess&&sess!=='guest'&&typeof window!=='undefined'&&window.__nage_db&&window.__nage_db.deleteProject){
+                window.__nage_db.deleteProject(p.id).catch(()=>{});
+            }
+        }
         function rnP(p,t){
             t.contentEditable='true';t.focus();getSelection().selectAllChildren(t);
             t.onclick=e=>e.stopPropagation();t.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();t.blur()}};
-            t.onblur=()=>{t.contentEditable='false';p.title=t.textContent.trim()||'Untitled';p.updated=Date.now();save();renderDash()};
+            t.onblur=()=>{
+                t.contentEditable='false';p.title=t.textContent.trim()||'Untitled';p.updated=Date.now();save();renderDash();
+                if(sess&&sess!=='guest'&&typeof window!=='undefined'&&window.__nage_db&&window.__nage_db.renameProject){
+                    window.__nage_db.renameProject(p.id,p.title).catch(()=>{});
+                }
+            };
         }
         function card(p){
             const c=h('div','proj'),th=h('div','proj-thumb'),im=p.pages.flatMap(x=>x.items).find(i=>i.k==='i'),t=h('div','proj-title',p.title),mb=h('button','proj-more');
@@ -337,6 +355,9 @@ const $=id=>document.getElementById(id);
             if(act){run(r,[]);setSel([]);fit([...cc.children])}
             if(f.length)addFiles(f,520,-260);
             save();if(r.say)toast(String(r.say));
+            if(sess&&sess!=='guest'&&typeof window!=='undefined'&&window.__nage_db&&window.__nage_db.createProject){
+                window.__nage_db.createProject(p.title,t).then(sp=>{if(sp&&sp.id){p.id=sp.id;save();}}).catch(()=>{});
+            }
         }
         async function create(force){
             if(creating)return;const t=ta.value.trim(),f=att;
@@ -459,7 +480,13 @@ const $=id=>document.getElementById(id);
         title.onkeydown=e=>{if(e.key==='Enter'){e.preventDefault();title.blur()}};
         title.onclick=e=>e.stopPropagation();
         title.oninput=()=>{if(cur)cur.title=title.textContent.trim()||'Untitled'};
-        title.onblur=()=>{if(!title.textContent.trim())title.textContent='Untitled';save()};
+        title.onblur=()=>{
+            if(!title.textContent.trim())title.textContent='Untitled';
+            save();
+            if(sess&&sess!=='guest'&&cur&&cur.id&&typeof window!=='undefined'&&window.__nage_db&&window.__nage_db.renameProject){
+                window.__nage_db.renameProject(cur.id,cur.title).catch(()=>{});
+            }
+        };
         $('btn-back-to-prompt').onclick=e=>{if(!title.parentElement.contains(e.target))leave()};
         $('logo-home').onclick=()=>show(ve);
 
@@ -471,8 +498,8 @@ const $=id=>document.getElementById(id);
         menu.onclick=e=>{
             const a=e.target.dataset.a;if(!a)return;menu.classList.add('hide');
             if(a==='link')(navigator.clipboard?navigator.clipboard.writeText(location.href):Promise.reject()).then(()=>toast('Link copied'),()=>toast('Copy is not available here'));
-            if(a==='dup'){save();const p=JSON.parse(JSON.stringify(cur));p.id=uid();p.title+=' copy';p.created=p.updated=Date.now();P.unshift(p);save();toast('Project duplicated')}
-            if(a==='del'){tomb.push(cur.id);P=P.filter(x=>x!==cur);cur=null;save();show(ve);toast('Project deleted')}
+            if(a==='dup'&&cur)dupP(cur);
+            if(a==='del'&&cur){delP(cur);show(ve);}
         };
         document.addEventListener('click',e=>{
             if(!menu.contains(e.target)&&!$('btn-share').contains(e.target))menu.classList.add('hide');

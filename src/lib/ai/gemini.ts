@@ -410,6 +410,44 @@ export async function executeAiGeneration(
     candidateKey !== "placeholder-gemini-api-key" &&
     !candidateKey.includes("placeholder");
 
+  // Specialized Image-to-Vector Illustration Engine (Approach B)
+  if (
+    (req.task === "illustration" ||
+      req.prompt.toLowerCase().includes("illustrat") ||
+      req.prompt.toLowerCase().includes("vector") ||
+      req.prompt.toLowerCase().includes("convert") ||
+      req.prompt.toLowerCase().includes("draw")) &&
+    req.attachedImage
+  ) {
+    const agentOutput = generateAgentDesign(
+      req.prompt,
+      "illustration",
+      req.camera,
+      req.attachedImage,
+      req.attachedScript,
+      req.vectorizedImage,
+      req.extractedPalette
+    );
+
+    await logAiGeneration(
+      userId,
+      req.projectId ?? null,
+      req.prompt,
+      "vector-posterizer",
+      "done"
+    );
+
+    return {
+      success: true,
+      text: agentOutput.reply,
+      thoughts: agentOutput.thoughts,
+      steps: agentOutput.steps,
+      generatedNodes: agentOutput.nodes,
+      rateLimitRemaining: remainingQuota,
+      rateLimitTotal: HOURLY_LIMIT,
+    };
+  }
+
   // 2. Real Google Gemini 3.8 Flash API call
   if (isRealApiKey) {
     try {
@@ -545,7 +583,9 @@ export async function executeAiGeneration(
     req.task,
     req.camera,
     req.attachedImage,
-    req.attachedScript
+    req.attachedScript,
+    req.vectorizedImage,
+    req.extractedPalette
   );
 
   await logAiGeneration(

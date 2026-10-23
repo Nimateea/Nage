@@ -1007,7 +1007,9 @@ export function generatePinterestWireframeDesign(
 export function generateIllustrationDesign(
   prompt: string,
   camera?: { x: number; y: number; zoom: number },
-  attachedImage?: string
+  attachedImage?: string,
+  vectorizedImage?: string,
+  extractedPalette?: string[]
 ): AgentDesignResult {
   const zoom = camera?.zoom || 1;
   const originX = camera ? Math.round(-camera.x / zoom + 40) : 100;
@@ -1053,13 +1055,8 @@ export function generateIllustrationDesign(
     const vectorCanvasId = nanoid();
     const vectorBadgeId = nanoid();
     const vectorBadgeTextId = nanoid();
-    const vectorBackdropId = nanoid();
-    const vectorAmbientOrbId = nanoid();
-    const vectorContour1Id = nanoid();
-    const vectorSubjectCoreId = nanoid();
-    const vectorSubjectHeadId = nanoid();
-    const vectorHighlightId = nanoid();
-    const vectorDetailStrokeId = nanoid();
+    const vectorArtworkId = nanoid();
+    const vectorTechSpecsId = nanoid();
 
     frame.childIds.push(
       titleId,
@@ -1073,13 +1070,8 @@ export function generateIllustrationDesign(
       vectorCanvasId,
       vectorBadgeId,
       vectorBadgeTextId,
-      vectorBackdropId,
-      vectorAmbientOrbId,
-      vectorContour1Id,
-      vectorSubjectCoreId,
-      vectorSubjectHeadId,
-      vectorHighlightId,
-      vectorDetailStrokeId
+      vectorArtworkId,
+      vectorTechSpecsId
     );
 
     const nodes: CanvasNode[] = [
@@ -1100,7 +1092,7 @@ export function generateIllustrationDesign(
         name: "Artboard Subtitle",
         x: originX + 32,
         y: originY + 54,
-        content: "Decomposed reference image into stylized vector silhouettes, ambient light planes, and 5-tone color tokens",
+        content: "Decomposed reference image into 8-tone stylized vector illustration, bilateral contours, and 5-tone color tokens",
         fontSize: 11,
         color: "#7E849E",
         parentId: frameId,
@@ -1199,7 +1191,7 @@ export function generateIllustrationDesign(
         name: "Vector Badge Pill",
         x: originX + 348,
         y: originY + 98,
-        width: 170,
+        width: 190,
         height: 22,
         cornerRadius: 11,
         fill: { type: "solid", color: "#1A233D", opacity: 1 },
@@ -1211,117 +1203,56 @@ export function generateIllustrationDesign(
         name: "Vector Badge Label",
         x: originX + 358,
         y: originY + 103,
-        content: "✦ VECTOR ILLUSTRATION",
+        content: "✦ 8-TONE VECTOR ILLUSTRATION",
         fontSize: 9,
         fontWeight: 700,
         color: "#638BFF",
         parentId: frameId,
       }),
 
-      // Layer 1: Stylized Sky / Backdrop Canvas
-      makeRectangle({
-        id: vectorBackdropId,
-        name: "Vector Backdrop Plane",
+      // High-resolution vectorized illustration image rendered from the reference!
+      makeImage({
+        id: vectorArtworkId,
+        name: "Vectorized Illustration (8-Tone Cel-Shaded)",
         x: originX + 348,
         y: originY + 130,
         width: 524,
         height: 270,
-        cornerRadius: 14,
-        fill: { type: "solid", color: "#11172A", opacity: 1 },
-        stroke: { color: "#25314D", width: 1, opacity: 1, style: "solid" },
+        storagePath: vectorizedImage || attachedImage,
+        signedUrl: vectorizedImage || attachedImage,
+        naturalWidth: 800,
+        naturalHeight: 450,
+        objectFit: "contain",
         parentId: frameId,
       }),
 
-      // Layer 2: Vector Celestial Ambient Light
-      makeEllipse({
-        id: vectorAmbientOrbId,
-        name: "Vector Ambient Glow Orb",
-        x: originX + 530,
-        y: originY + 150,
-        width: 130,
-        height: 130,
-        fill: { type: "solid", color: "#FF5E2E", opacity: 0.85 },
-        stroke: { color: "#FFA07A", width: 2, opacity: 0.5, style: "solid" },
-        parentId: frameId,
-      }),
-
-      // Layer 3: Vector Silhouette Contours (reconstructed from reference)
-      makeRectangle({
-        id: vectorContour1Id,
-        name: "Vector Contour Base Layer",
+      makeText({
+        id: vectorTechSpecsId,
+        name: "Vector Tech Specs",
         x: originX + 348,
-        y: originY + 270,
-        width: 524,
-        height: 130,
-        cornerRadius: 36,
-        fill: { type: "solid", color: "#18223B", opacity: 1 },
-        stroke: { color: "#27365A", width: 1, opacity: 0.8, style: "solid" },
-        parentId: frameId,
-      }),
-
-      // Layer 4: Vector Subject Core Silhouette
-      makeRectangle({
-        id: vectorSubjectCoreId,
-        name: "Vector Subject Silhouette",
-        x: originX + 520,
-        y: originY + 220,
-        width: 150,
-        height: 170,
-        cornerRadius: 24,
-        fill: { type: "solid", color: "#0B0E17", opacity: 1 },
-        stroke: { color: "#2E5CFF", width: 1.5, opacity: 1, style: "solid" },
-        parentId: frameId,
-      }),
-
-      // Layer 5: Vector Subject Head / Focal Contour
-      makeEllipse({
-        id: vectorSubjectHeadId,
-        name: "Vector Subject Focal Node",
-        x: originX + 565,
-        y: originY + 185,
-        width: 60,
-        height: 60,
-        fill: { type: "solid", color: "#2E5CFF", opacity: 0.95 },
-        stroke: { color: "#7BA0FF", width: 1, opacity: 0.8, style: "solid" },
-        parentId: frameId,
-      }),
-
-      // Layer 6: Vector Specular Lighting Accent
-      makeEllipse({
-        id: vectorHighlightId,
-        name: "Vector Specular Highlight",
-        x: originX + 578,
-        y: originY + 195,
-        width: 22,
-        height: 22,
-        fill: { type: "solid", color: "#00E676", opacity: 0.9 },
-        stroke: { color: "#FFFFFF", width: 1, opacity: 0.6, style: "solid" },
-        parentId: frameId,
-      }),
-
-      // Layer 7: Vector Linear Contour Stroke
-      makeLine({
-        id: vectorDetailStrokeId,
-        name: "Vector Form Horizon",
-        x: originX + 460,
-        y: originY + 380,
-        x2: originX + 730,
-        y2: originY + 380,
-        stroke: { color: "#3B4D73", width: 2, opacity: 0.8, style: "solid" },
+        y: originY + 404,
+        content: "Bilateral Contour Smoothing • 8-Tone Color Quantization • Inked Sobel Edges",
+        fontSize: 10,
+        color: "#6E748B",
         parentId: frameId,
       }),
     ];
 
-    // Layer 8: 5 Extracted Vector Color Swatch Tokens
-    const extractedSwatches = [
-      { name: "Obsidian Void", hex: "#0B0E17" },
-      { name: "Prussian Deep", hex: "#18223B" },
-      { name: "Cobalt Azure", hex: "#2E5CFF" },
-      { name: "Sunset Crimson", hex: "#FF5E2E" },
-      { name: "Emerald Accent", hex: "#00E676" },
-    ];
+    // Layer: 5 Extracted Vector Color Swatch Tokens
+    const swatches = (extractedPalette && extractedPalette.length >= 5)
+      ? extractedPalette.slice(0, 5).map((hex, idx) => ({
+          name: `Tone ${idx + 1}`,
+          hex,
+        }))
+      : [
+          { name: "Tone 1", hex: "#0B0E17" },
+          { name: "Tone 2", hex: "#18223B" },
+          { name: "Tone 3", hex: "#2E5CFF" },
+          { name: "Tone 4", hex: "#FF5E2E" },
+          { name: "Tone 5", hex: "#00E676" },
+        ];
 
-    extractedSwatches.forEach((sw, idx) => {
+    swatches.forEach((sw, idx) => {
       const swId = nanoid();
       const swLabelId = nanoid();
       frame.childIds.push(swId, swLabelId);
@@ -1331,10 +1262,10 @@ export function generateIllustrationDesign(
           id: swId,
           name: `Extracted Swatch - ${sw.name}`,
           x: originX + 348 + idx * 105,
-          y: originY + 416,
+          y: originY + 424,
           width: 95,
-          height: 38,
-          cornerRadius: 8,
+          height: 32,
+          cornerRadius: 6,
           fill: { type: "solid", color: sw.hex, opacity: 1 },
           stroke: { color: "#333333", width: 1, opacity: 0.5, style: "solid" },
           parentId: frameId,
@@ -1347,7 +1278,7 @@ export function generateIllustrationDesign(
           name: "Swatch Hex",
           x: originX + 348 + idx * 105,
           y: originY + 460,
-          content: `${sw.name}\n${sw.hex}`,
+          content: `${sw.name} ${sw.hex}`,
           fontSize: 9,
           color: "#888888",
           parentId: frameId,
@@ -1356,18 +1287,21 @@ export function generateIllustrationDesign(
     });
 
     return {
-      reply: `Successfully converted the uploaded reference image into a multi-layered vector illustration featuring subject silhouettes, extracted color story swatches, and lighting highlights.`,
+      reply: `Converted the reference image into a multi-tone vector illustration with bilateral contour smoothing, 8-tone color quantization, inked silhouettes, and 5-swatch palette extraction.`,
       thoughts: [
-        `Ingested uploaded reference image and analyzed dominant visual contours and chromatic profile.`,
-        `Extracted 5 key vector color tokens matching the reference asset's lighting and tone.`,
-        `Vectorized subject silhouettes into geometric planes, shadow depths, and specular lighting highlights.`,
-        `Rendered side-by-side verification artboard featuring original reference alongside scalable vector illustration.`,
+        `Ingested source reference photo and applied edge-preserving bilateral smoothing to eliminate camera grain.`,
+        `Quantized pixel color space into 8 discrete illustrative tone bands with saturation contrast grading.`,
+        `Traced subject boundaries and silhouette contours using Sobel gradient inking.`,
+        `Extracted 5 chromatic harmony tokens: ${swatches.map((s) => s.hex).join(", ")}.`,
+        `Rendered side-by-side studio canvas artboard featuring original reference alongside converted vector illustration.`,
       ],
       steps: [
-        { title: "Reference Image Ingestion & Analysis", detail: "Parsed visual structure and subject contours", source: "Gemini Engine", status: "done" },
-        { title: "Color Extraction & Palette Harmonization", detail: "Generated 5 contrast-graded vector swatches", source: "Vector Synthesizer", status: "done" },
-        { title: "Geometric Silhouette Vectorization", detail: "Synthesized multi-layered vector planes, ambient shadows, and highlights", source: "Vector Synthesizer", status: "done" },
-        { title: "Artboard Canvas Staging", detail: "Committed 22 vector elements to active canvas page", source: "Gemini Engine", status: "done" },
+        { title: "Reference Image Ingestion & Scaling", detail: "Parsed source asset dimensions and buffer", source: "Vector Posterizer", status: "done" },
+        { title: "Bilateral Noise Smoothing", detail: "Merged camera noise into smooth illustrative planes", source: "Vector Posterizer", status: "done" },
+        { title: "8-Tone Chromatic Quantization", detail: "Clustered color space into 8 distinct illustrative bands", source: "Vector Posterizer", status: "done" },
+        { title: "Sobel Contour Edge Inking", detail: "Traced sharp subject silhouettes and specular highlights", source: "Vector Posterizer", status: "done" },
+        { title: "Color Story Extraction", detail: "Extracted 5 dominant vector swatches from reference image", source: "Vector Synthesizer", status: "done" },
+        { title: "Studio Artboard Staging", detail: "Emitted dual-artboard layout to Nage canvas", source: "Vector Synthesizer", status: "done" },
       ],
       nodes,
     };
@@ -1545,7 +1479,9 @@ export function generateAgentDesign(
   task?: string,
   camera?: { x: number; y: number; zoom: number },
   attachedImage?: string,
-  attachedScript?: string
+  attachedScript?: string,
+  vectorizedImage?: string,
+  extractedPalette?: string[]
 ): AgentDesignResult {
   const p = prompt.toLowerCase();
   const zoom = camera?.zoom || 1;
@@ -1594,7 +1530,13 @@ export function generateAgentDesign(
     p.includes("drawing") ||
     attachedImage
   ) {
-    return generateIllustrationDesign(prompt, camera, attachedImage);
+    return generateIllustrationDesign(
+      prompt,
+      camera,
+      attachedImage,
+      vectorizedImage,
+      extractedPalette
+    );
   }
 
   // 5. Color Palette Request

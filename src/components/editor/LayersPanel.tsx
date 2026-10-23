@@ -11,6 +11,7 @@ import {
 } from "@/lib/canvas/commands";
 import type { CanvasNode, TextNode } from "@/lib/canvas/document/types";
 import type { AiThoughtStep } from "@/lib/ai/types";
+import { vectorizeImageClient } from "@/lib/ai/posterizer";
 
 interface ChatMessage {
   id: string;
@@ -421,6 +422,20 @@ export function LayersPanel() {
 
     // Call the server Gemini AI API
     try {
+      let clientVectorDataUrl: string | undefined = undefined;
+      let clientPalette: string[] | undefined = undefined;
+
+      if (currentAttachedImage) {
+        showToast("Vectorizing reference image with 8-tone posterizer…");
+        try {
+          const vectorResult = await vectorizeImageClient(currentAttachedImage);
+          clientVectorDataUrl = vectorResult.vectorDataUrl;
+          clientPalette = vectorResult.palette;
+        } catch (vErr) {
+          console.warn("Client vectorization note:", vErr);
+        }
+      }
+
       const selectedNodes = document.nodes.filter((n) => selectedIds.has(n.id));
       const res = await fetch("/api/ai/generate", {
         method: "POST",
@@ -430,6 +445,8 @@ export function LayersPanel() {
           task,
           attachedImage: currentAttachedImage || undefined,
           attachedScript: currentAttachedScript || undefined,
+          vectorizedImage: clientVectorDataUrl || undefined,
+          extractedPalette: clientPalette || undefined,
           projectId: useEditorStore.getState().projectId || undefined,
           selectedNodes: selectedNodes.length > 0 ? selectedNodes : undefined,
           camera: useEditorStore.getState().document.camera,

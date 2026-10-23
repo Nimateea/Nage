@@ -19,12 +19,14 @@ export interface AiGenerateRequest {
   camera?: { x: number; y: number; zoom: number };
   attachedImage?: string; // Base64 data URL or asset URL
   attachedScript?: string; // Script text or screenplay excerpt
+  vectorizedImage?: string; // Client-side vectorized / posterized illustration asset data URL
+  extractedPalette?: string[]; // 5 dominant hex tokens extracted from reference
 }
 
 export interface AiThoughtStep {
   title: string;
   detail?: string;
-  source?: "Unsplash" | "Pexels" | "Pinterest" | "Pixabay" | "Gemini Engine" | "Vector Synthesizer";
+  source?: "Unsplash" | "Pexels" | "Pinterest" | "Pixabay" | "Gemini Engine" | "Vector Synthesizer" | "Vector Posterizer";
   status: "done" | "in_progress" | "pending";
 }
 

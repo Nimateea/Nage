@@ -156,13 +156,9 @@ describe("AI Generation Engine", () => {
       expect(frame).toBeDefined();
       expect(frame?.name).toContain("Illustration");
 
-      // Verify atmospheric layers and celestial orb
-      const orb = result.nodes.find((n) => n.type === "ellipse");
-      expect(orb).toBeDefined();
-
-      // Verify image node created for attached reference
-      const img = result.nodes.find((n) => n.type === "image");
-      expect(img).toBeDefined();
+      // Verify image nodes created for attached reference and converted vector illustration
+      const images = result.nodes.filter((n) => n.type === "image");
+      expect(images.length).toBeGreaterThanOrEqual(1);
 
       // Verify extracted color swatches and vector silhouette nodes
       const swatches = result.nodes.filter(

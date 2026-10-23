@@ -8,7 +8,7 @@ const $=id=>document.getElementById(id);
         const uid=()=>Date.now().toString(36)+Math.random().toString(36).slice(2,5);
         let D={};try{D=JSON.parse(localStorage.getItem('nage:v1')||'{}')}catch(e){}
         let P=D.projects||[],font=D.font||'',cur=null,zoom=1,panX=0,panY=0,tool='move',S=new Set(),G=[],pg=null,accts=D.accts||[],sess=typeof D.sess==='string'?D.sess:null,gdp=D.dp||'',dp=gdp,lastN=D.last||'',LF=D.lf||[],sbOn=true,tomb=D.tomb||[],sort=D.sort||'recent',flt=D.filter||'all',ruler=true,crop=null,op=null,space=false,H=[],hi=-1,clip=[],att=[],lx=0,ly=0,rec=null;
-        const ve=$('view-empty'),vp=$('view-prompt'),vm=$('view-moodboard'),ta=vp.querySelector('.prompt-textarea'),cv=$('canvas-container'),cc=$('canvas-content'),title=$('project-title');
+        let vi=$('view-illus'); const ve=$('view-empty'),vp=$('view-prompt'),vm=$('view-moodboard'),ta=vp.querySelector('.prompt-textarea'),cv=$('canvas-container'),cc=$('canvas-content'),title=$('project-title');
         cc.style.transition='none';
         P.forEach(p=>{if(!p.pages){p.pages=[{id:uid(),name:'Page 1',items:p.items||[],guides:p.guides||[]}];delete p.items;delete p.guides}p.created=p.created||p.updated||Date.now()});
         if(D.acct&&!D.accts){accts=[{id:'u1',...D.acct,dp:D.dp||''}];if(D.sess===true)sess='u1'}
@@ -359,14 +359,60 @@ const $=id=>document.getElementById(id);
                 window.__nage_db.createProject(p.title,t).then(sp=>{if(sp&&sp.id){p.id=sp.id;save();}}).catch(()=>{});
             }
         }
+        function startIllustration(t, f) {
+            const n = Date.now(), ti = (t || 'Untitled Illustration').trim();
+            const p = {
+                id: uid(),
+                title: ti.length > 28 ? ti.slice(0, 28) + '…' : ti,
+                created: n,
+                updated: n,
+                owner: sess || 'guest',
+                pi: 0,
+                pages: [{ id: uid(), name: 'Page 1', guides: [], items: [] }],
+                illus: {
+                    pi: 0,
+                    pages: [{
+                        id: uid(),
+                        name: 'Page 1',
+                        nodes: [
+                            { id: 1, k: 'text', x: -160, y: -120, v: t || 'Illustration concept', name: 'Prompt 1' },
+                            { id: 2, k: 'style', x: -160, y: 160, v: 'Flat vector', c: '', name: 'Style 1' },
+                            { id: 3, k: 'gen', x: 200, y: -30, name: 'Generate 1' }
+                        ],
+                        edges: [
+                            { from: 1, to: 3 },
+                            { from: 2, to: 3 }
+                        ],
+                        nid: 3
+                    }]
+                }
+            };
+            P.unshift(p);
+            ta.value = '';
+            att = [];
+            cur = p;
+            save();
+            ilOpen();
+            if (f && f.length) {
+                addFiles(f, 520, -260);
+            }
+            if (sess && sess !== 'guest' && typeof window !== 'undefined' && window.__nage_db && window.__nage_db.createProject) {
+                window.__nage_db.createProject(p.title, t).then(sp => {
+                    if (sp && sp.id) {
+                        p.id = sp.id;
+                        save();
+                    }
+                }).catch(() => {});
+            }
+        }
         async function create(force){
             if(creating)return;const t=ta.value.trim(),f=att;
-            if(!t)return start({title:'Untitled'},f,'');
+            if(!t&&!force)return start({title:'Untitled'},f,'');
             creating=true;ta.disabled=true;st.textContent='Analysing your prompt…';
             let r=null;try{r=await plan(t,force,f.length)}catch(e){r=null}
             creating=false;ta.disabled=false;st.textContent='';
             const type=r&&['moodboard','illustration','font'].includes(r.type)?r.type:(force||HEUR(t));
-            if(type==='illustration')return soon('Illustrations');
+            if(type==='illustration')return startIllustration(t,f);
             if(type==='font')return soon('Font');
             start(r||{},f,t);
         }
@@ -538,7 +584,7 @@ const $=id=>document.getElementById(id);
         };
         vp.querySelector('.upload-btn').onclick=()=>create();
         ta.onkeydown=e=>{if(e.key==='Enter'&&!e.shiftKey){e.preventDefault();create()}};
-        cards[0].onclick=()=>soon('Illustrations');
+        cards[0].onclick=()=>{const t=ta.value.trim();startIllustration(t,att)};
         cards[1].onclick=()=>create('moodboard');
         cards[2].onclick=()=>soon('Font');
         vp.querySelectorAll('.nav-link').forEach(a=>a.onclick=e=>{e.preventDefault();authOpen(/create/i.test(a.textContent)?'signup':'login')});
@@ -809,11 +855,13 @@ const $=id=>document.getElementById(id);
             gen:'<svg xmlns="http://www.w3.org/2000/svg" width="20" height="20" viewBox="0 0 20 20" fill="none"><path d="M16.25 3.28167V4.58333M16.25 4.58333V5.88583M16.25 4.58333H15.2083M16.25 4.58333H17.2916M10.8333 4.16667H7.91663C5.17746 4.16667 3.80746 4.16667 2.88496 4.92333C2.71633 5.06174 2.5617 5.21637 2.42329 5.385C1.66663 6.30833 1.66663 7.67667 1.66663 10.4167C1.66663 13.1558 1.66663 14.5258 2.42329 15.4483C2.5617 15.617 2.71633 15.7716 2.88496 15.91C3.80829 16.6667 5.17663 16.6667 7.91663 16.6667H10.8333C13.9758 16.6667 15.5475 16.6667 16.5233 15.69C17.4991 14.7133 17.5 13.1425 17.5 10V9.58333M18.3333 4.58333L17.43 4.2825C17.2253 4.21415 17.0393 4.09914 16.8867 3.94656C16.7342 3.79398 16.6191 3.608 16.5508 3.40333L16.25 2.5L15.9491 3.40333C15.8808 3.608 15.7658 3.79398 15.6132 3.94656C15.4606 4.09914 15.2746 4.21415 15.07 4.2825L14.1666 4.58333L15.07 4.88417C15.485 5.0225 15.8108 5.34833 15.9491 5.76333L16.25 6.66667L16.5508 5.76333C16.6191 5.55866 16.7342 5.37269 16.8867 5.22011C17.0393 5.06753 17.2253 4.95252 17.43 4.88417L18.3333 4.58333Z" stroke="currentColor" stroke-width="1.5" stroke-linecap="round" stroke-linejoin="round"/></svg>'
         };
         const IT={text:'Prompt',image:'Reference',style:'Style',gen:'Generate'},PRESETS=['Flat vector','Line art','Watercolor','3D clay','Pixel art','Isometric','Minimal'];
-        const vi=h('div','w-full h-full flex flex-col relative bg-[#000000] hide');vi.id='view-illus';
-        vi.innerHTML='<div id="il-c" class="absolute inset-0 overflow-hidden z-0" style="touch-action:none;cursor:grab"><div id="il-x" class="absolute top-1/2 left-1/2 w-0 h-0"><svg id="il-w" style="position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;pointer-events:none"></svg><div id="il-n"></div></div></div><div id="il-hint">Add a Prompt node to start</div>'
-            +'<header class="w-full flex justify-between items-center px-6 py-6 absolute top-0 left-0 z-10 pointer-events-none"><div id="il-back" class="moodboard-nav cursor-pointer group hover:bg-[#1a1a1a] transition-colors pointer-events-auto" title="Back to moodboard"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A0A0A0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="group-hover:stroke-white transition-colors"><polyline points="15 18 9 12 15 6"></polyline></svg><div class="nage-logo" style="font-size:20px;letter-spacing:-0.5px;line-height:1">nage</div><div class="flex items-center gap-2"><span id="il-title" class="text-white text-[13px] font-medium ml-2"></span><span class="text-[#555] text-[13px]">Illustrations</span></div></div></header>'
-            +'<div class="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10"><div class="toolbar" id="il-tb"></div></div>';
-        vm.after(vi);
+        if(!vi){
+            vi=h('div','w-full h-full flex flex-col relative bg-[#000000] hide');vi.id='view-illus';
+            vi.innerHTML='<div id="il-c" class="absolute inset-0 overflow-hidden z-0" style="touch-action:none;cursor:grab"><div id="il-x" class="absolute top-1/2 left-1/2 w-0 h-0"><svg id="il-w" style="position:absolute;left:0;top:0;width:1px;height:1px;overflow:visible;pointer-events:none"></svg><div id="il-n"></div></div></div><div id="il-hint">Add a Prompt node to start</div>'
+                +'<header class="w-full flex justify-between items-center px-6 py-6 absolute top-0 left-0 z-10 pointer-events-none"><div id="il-back" class="moodboard-nav cursor-pointer group hover:bg-[#1a1a1a] transition-colors pointer-events-auto" title="Back to moodboard"><svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A0A0A0" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="group-hover:stroke-white transition-colors"><polyline points="15 18 9 12 15 6"></polyline></svg><div class="nage-logo" style="font-size:20px;letter-spacing:-0.5px;line-height:1">nage</div><div class="flex items-center gap-2"><span id="il-title" class="text-white text-[13px] font-medium ml-2"></span><span class="text-[#555] text-[13px]">Illustrations</span></div></div></header>'
+                +'<div class="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10"><div class="toolbar" id="il-tb"></div></div>';
+            vm.after(vi);
+        }
         const icv=$('il-c'),ix=$('il-x'),iw=$('il-w'),inn=$('il-n'),itb=$('il-tb');
         let ig=null,iz=1,ipx=0,ipy=0,isel=null,iop=null,ilx=0,ily=0,itm=0,IRS=[],ilL={id:0,t:0};
         const NB=(id,t,svg)=>`<button class="icon-btn nd" id="${id}" title="${t}">${svg}</button>`;

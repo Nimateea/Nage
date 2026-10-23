@@ -502,6 +502,32 @@ export function NageApp({ initialUser, initialProjects }: NageAppProps = {}) {
         </div>
       </div>
 
+      {/* ── View 4: Illustration Node Canvas ────────────────────── */}
+      <div id="view-illus" className="w-full h-full flex flex-col relative bg-[#000000] hide">
+        <div id="il-c" className="absolute inset-0 overflow-hidden z-0" style={{ touchAction: "none", cursor: "grab" }}>
+          <div id="il-x" className="absolute top-1/2 left-1/2 w-0 h-0">
+            <svg id="il-w" style={{ position: "absolute", left: 0, top: 0, width: "1px", height: "1px", overflow: "visible", pointerEvents: "none" }} />
+            <div id="il-n" />
+          </div>
+        </div>
+        <div id="il-hint">Add a Prompt node to start</div>
+        <header className="w-full flex justify-between items-center px-6 py-6 absolute top-0 left-0 z-10 pointer-events-none">
+          <div id="il-back" className="moodboard-nav cursor-pointer group hover:bg-[#1a1a1a] transition-colors pointer-events-auto" title="Back to moodboard">
+            <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#A0A0A0" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="group-hover:stroke-white transition-colors">
+              <polyline points="15 18 9 12 15 6" />
+            </svg>
+            <div className="nage-logo" style={{ fontSize: "20px", letterSpacing: "-0.5px", lineHeight: 1 }}>nage</div>
+            <div className="flex items-center gap-2">
+              <span id="il-title" className="text-white text-[13px] font-medium ml-2" />
+              <span className="text-[#555] text-[13px]">Illustrations</span>
+            </div>
+          </div>
+        </header>
+        <div className="absolute bottom-8 left-1/2 transform -translate-x-1/2 z-10">
+          <div className="toolbar" id="il-tb" />
+        </div>
+      </div>
+
       <div id="toast" className="toast" />
     </div>
   );
